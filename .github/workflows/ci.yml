@@ -22,57 +22,25 @@ jobs:
             build-essential cmake python3-numpy python3-scipy \
             python3-matplotlib python3-pandas python3-yaml
 
-      - name: ROS 2 parameter files load
-        run: python3 tests/test_param_files.py
+      # Deliberately the same entry point the README tells a reader to run, so
+      # CI cannot drift away from the documented command. It builds from
+      # source, runs every check, regenerates the results and then verifies the
+      # artifacts exist and that all 84 runs finished cleanly.
+      - name: Full pipeline (scripts/run_all.sh)
+        run: bash scripts/run_all.sh
 
-      - name: Build
+      # The benchmark is deterministic, so regenerating on a clean checkout must
+      # reproduce the committed results exactly. If this fails, either the
+      # committed artifacts are stale or something has become non-reproducible.
+      - name: Committed results are reproducible
         run: |
-          cmake -S src/shuttle_control/core -B build/core \
-            -DCMAKE_BUILD_TYPE=Release -DSHUTTLE_CORE_BUILD_TESTS=ON
-          cmake --build build/core -j"$(nproc)"
-
-      - name: Controller core tests
-        run: ./build/core/test_core
-
-      - name: Scenario geometry matches between C++ and Python
-        run: |
-          mkdir -p /tmp/paths
-          ./build/core/controller_bench --dump-paths /tmp/paths
-          python3 tests/test_scenarios_match.py --paths /tmp/paths
-
-      - name: Calibration tests
-        run: |
-          PYTHONPATH="$PWD/src/shuttle_perception" \
-            python3 tests/test_calibration.py
-
-      - name: Comparison runs end to end
-        run: |
-          mkdir -p results/bench/timeseries
-          ./build/core/controller_bench --out results/bench --tune
-          python3 analysis/compare_controllers.py \
-            --metrics results/bench/metrics.csv \
-            --timeseries results/bench/timeseries \
-            --figures /tmp/figures \
-            --results /tmp/RESULTS.md
-
-      - name: Every benchmark run must finish cleanly
-        run: |
-          python3 - <<'PY'
-          import csv, sys
-          bad = []
-          with open("results/bench/metrics.csv") as fh:
-              for row in csv.DictReader(fh):
-                  if (row["goal_reached"] != "1" or row["diverged"] == "1"
-                          or row["stalled"] == "1"):
-                      bad.append(f"{row['controller']} {row['scenario']} "
-                                 f"@ {row['target_speed']} noise={row['noise']}")
-          if bad:
-              print("runs that did not finish cleanly:")
-              for b in bad:
-                  print("  " + b)
-              sys.exit(1)
-          print("all runs finished cleanly")
-          PY
+          if ! git diff --exit-code --stat -- \
+              docs/RESULTS.md analysis/figures calibration/extrinsics.yaml \
+              src/shuttle_bringup/config/tuned_gains.yaml; then
+            echo "::error::regenerating changed committed artifacts; " \
+                 "re-run scripts/run_all.sh and commit the result"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -80,8 +48,8 @@ jobs:
           name: comparison-results
           path: |
             results/bench/metrics.csv
-            /tmp/figures
-            /tmp/RESULTS.md
+            docs/RESULTS.md
+            analysis/figures
 
   # The ROS 2 workspace. Build and lint only; the Gazebo comparison is too heavy
   # for CI and is run locally via scripts/run_comparison.sh.
