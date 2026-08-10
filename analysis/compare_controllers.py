@@ -58,6 +58,21 @@ def fmt(value: float, places: int = 4) -> str:
     return f"{value:.{places}f}"
 
 
+def clean_subset(df, speed):
+    """Rows at `speed` with noise off, falling back to all rows at that speed.
+
+    The offline benchmark runs each case with and without odometry noise, so the
+    noise-free rows are the like-for-like set. A Gazebo run has no such pairing:
+    the simulator always has sensor noise, and every row is labelled noisy.
+    Filtering on noise == 0 there leaves nothing, which is how this script came
+    to emit a document announcing a winner of "0 of the 0" routes.
+    """
+    sub = df[(df.target_speed == speed) & (df.noise == 0)]
+    if sub.empty:
+        sub = df[df.target_speed == speed]
+    return sub
+
+
 # --------------------------------------------------------------------------
 # Figures
 # --------------------------------------------------------------------------
@@ -154,7 +169,7 @@ def fig_step_response(df, ts_dir, out_dir):
 
 def fig_rms_by_scenario(df, out_dir, speed):
     """Grouped bars: RMS cross-track error per scenario."""
-    sub = df[(df.target_speed == speed) & (df.noise == 0)]
+    sub = clean_subset(df, speed)
     if sub.empty:
         return None
     scenarios = list(sub.scenario.unique())
@@ -237,7 +252,7 @@ def fig_speed_and_noise(df, out_dir):
 # --------------------------------------------------------------------------
 
 def scenario_table(df, speed) -> str:
-    sub = df[(df.target_speed == speed) & (df.noise == 0)]
+    sub = clean_subset(df, speed)
     lines = [
         "| Scenario | Tuned on | PP RMS (m) | Stanley RMS (m) | PP max (m) | "
         "Stanley max (m) | Closer |",
@@ -341,7 +356,7 @@ def speed_table(df) -> str:
 
 def build_verdict(df, speed) -> tuple[str, dict]:
     """Derive the conclusion from the data rather than asserting it."""
-    sub = df[(df.target_speed == speed) & (df.noise == 0)]
+    sub = clean_subset(df, speed)
     transient = ["straight_offset", "heading_offset"]
 
     wins = {"pure_pursuit": [], "stanley": []}
@@ -360,17 +375,47 @@ def build_verdict(df, speed) -> tuple[str, dict]:
 
     stats = {}
     for ctrl in CONTROLLERS:
+        # A Gazebo run has no noise-free counterpart, so these can legitimately
+        # be absent. Carry NaN through rather than inventing a zero, and let the
+        # table render it as "n/a".
         clean = df[(df.controller == ctrl) & (df.noise == 0)].ct_rms.mean()
         noisy = df[(df.controller == ctrl) & (df.noise == 1)].ct_rms.mean()
+        have_both = not (pd.isna(clean) or pd.isna(noisy)) and clean > 0
         stats[ctrl] = {
             "clean": float(clean),
             "noisy": float(noisy),
-            "penalty_pct": float(100.0 * (noisy - clean) / clean) if clean else 0.0,
+            "penalty_pct": (float(100.0 * (noisy - clean) / clean)
+                            if have_both else float("nan")),
             "effort": float(df[df.controller == ctrl].control_effort.mean()),
             "failures": int(((df.controller == ctrl) &
                              ((df.diverged == 1) | (df.stalled == 1) |
                               (df.goal_reached == 0))).sum()),
         }
+
+    scenarios_present = list(sub.scenario.unique())
+    if len(scenarios_present) < 3:
+        # A single route is a data point, not a comparison. Say so rather than
+        # dressing up an n-of-1 result as a verdict.
+        parts = []
+        for scenario in scenarios_present:
+            pp = sub[(sub.scenario == scenario) &
+                     (sub.controller == "pure_pursuit")].ct_rms.mean()
+            st = sub[(sub.scenario == scenario) &
+                     (sub.controller == "stanley")].ct_rms.mean()
+            if pd.isna(pp) or pd.isna(st):
+                continue
+            closer = "Pure Pursuit" if pp < st else "Stanley"
+            parts.append(
+                f"on `{scenario}` {closer} was closer "
+                f"({fmt(min(pp, st))} m against {fmt(max(pp, st))} m RMS)")
+        detail = "; ".join(parts) if parts else "no paired runs were recorded"
+        verdict = (
+            f"Too few scenarios here to draw a conclusion: {detail}. "
+            "This is a single-route check, not the controller comparison — "
+            "see docs/RESULTS.md for that, which covers seven scenarios at "
+            "three speeds with and without odometry noise."
+        )
+        return verdict, stats
 
     verdict = (
         f"Pure Pursuit tracks curvature more closely, winning "
@@ -384,19 +429,36 @@ def build_verdict(df, speed) -> tuple[str, dict]:
     return verdict, stats
 
 
-def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir):
+def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir,
+                  metrics_path):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     n_runs = len(df)
     failures = int(((df.diverged == 1) | (df.stalled == 1) |
                     (df.goal_reached == 0)).sum())
 
+    gazebo = "gazebo" in metrics_path
+    regenerator = ("scripts/run_comparison.sh" if gazebo
+                   else "scripts/run_bench.sh")
+
     with open(path, "w", encoding="utf-8") as f:
-        f.write("# Controller comparison results\n\n")
+        title = ("Controller comparison in Gazebo" if gazebo
+                 else "Controller comparison results")
+        f.write(f"# {title}\n\n")
         f.write(
-            "Generated by `analysis/compare_controllers.py` from "
-            "`results/bench/metrics.csv`. Do not edit by hand: "
-            "`scripts/run_bench.sh` regenerates the whole file.\n\n"
+            f"Generated by `analysis/compare_controllers.py` from "
+            f"`{metrics_path}`. Do not edit by hand: `{regenerator}` "
+            f"regenerates the whole file.\n\n"
         )
+        if gazebo:
+            f.write(
+                "> These are physics-simulation runs, scored against the "
+                "Gazebo ground-truth pose. They are **not** the controller "
+                "comparison: the runs use a static `map -> odom` with AMCL "
+                "disabled, so the error is dominated by odometry drift rather "
+                "than by the control law, and Gazebo runs are not "
+                "bit-reproducible. See [RESULTS.md](RESULTS.md) for the "
+                "controller comparison proper.\n\n"
+            )
 
         f.write("## Conclusion\n\n")
         f.write(verdict + "\n\n")
@@ -450,10 +512,13 @@ def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir):
         f.write("| --- | ---: | ---: | ---: | ---: | ---: |\n")
         for ctrl in CONTROLLERS:
             s = stats[ctrl]
+            clean = "n/a" if pd.isna(s["clean"]) else fmt(s["clean"])
+            noisy = "n/a" if pd.isna(s["noisy"]) else fmt(s["noisy"])
+            penalty = ("n/a" if pd.isna(s["penalty_pct"])
+                       else f"+{s['penalty_pct']:.1f}%")
             f.write(
-                f"| {LABEL[ctrl]} | {fmt(s['clean'])} | {fmt(s['noisy'])} | "
-                f"+{s['penalty_pct']:.1f}% | {fmt(s['effort'], 2)} | "
-                f"{s['failures']} |\n"
+                f"| {LABEL[ctrl]} | {clean} | {noisy} | {penalty} | "
+                f"{fmt(s['effort'], 2)} | {s['failures']} |\n"
             )
         f.write(f"\n{n_runs} runs total, {failures} of which failed to finish.\n\n")
 
@@ -517,13 +582,16 @@ def main() -> int:
 
     verdict, stats = build_verdict(df, speed)
     write_results(args.results, df, verdict, stats, figures, speed, gains_text,
-                  args.timeseries)
+                  args.timeseries, args.metrics)
 
     print(verdict)
     for ctrl in CONTROLLERS:
         s = stats[ctrl]
-        print(f"  {LABEL[ctrl]:<13} clean {s['clean']:.4f} m  "
-              f"noisy {s['noisy']:.4f} m (+{s['penalty_pct']:.1f}%)  "
+        clean = "n/a" if pd.isna(s["clean"]) else f"{s['clean']:.4f} m"
+        noisy = "n/a" if pd.isna(s["noisy"]) else f"{s['noisy']:.4f} m"
+        penalty = ("" if pd.isna(s["penalty_pct"])
+                   else f" (+{s['penalty_pct']:.1f}%)")
+        print(f"  {LABEL[ctrl]:<13} clean {clean}  noisy {noisy}{penalty}  "
               f"effort {s['effort']:.2f}  failures {s['failures']}")
     print(f"Wrote {args.results}")
     for title, path in figures:

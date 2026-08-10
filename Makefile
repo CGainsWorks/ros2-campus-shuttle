@@ -1,8 +1,9 @@
 # Convenience wrappers. Everything here is also a plain docker compose command.
-.PHONY: help demo bench test calibration sim gazebo-comparison clean
+.PHONY: help demo bench comparison test calibration sim gazebo-comparison clean
 
 help:
-	@echo "make demo              reproduce the headline controller comparison"
+	@echo "make demo              run everything and verify the artifacts"
+	@echo "make comparison        just the controller comparison"
 	@echo "make test              run every check that does not need ROS"
 	@echo "make calibration       reproduce the camera-to-LiDAR calibration"
 	@echo "make sim               interactive shell in the ROS 2 + Gazebo image"
@@ -11,6 +12,9 @@ help:
 
 demo bench:
 	docker compose run --rm bench
+
+comparison:
+	docker compose run --rm comparison
 
 test:
 	docker compose run --rm test

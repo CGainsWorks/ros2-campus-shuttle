@@ -117,12 +117,44 @@ to under a micrometre.
 
 | Test | What it protects |
 | --- | --- |
-| `test_core` (C++, 142 checks) | Path geometry, projection signs, speed limiter, plant integration, steering-sign conventions, determinism, **path continuity** |
+| `test_core` (C++, 145 checks) | Path geometry, projection signs, speed limiter, plant integration, steering-sign conventions, determinism, **path continuity**, **speed survives a replan** |
 | `tests/test_scenarios_match.py` | The two scenario implementations agree |
+| `tests/test_param_files.py` | Every ROS 2 parameter file will actually load |
 | `tests/test_calibration.py` | Calibration accuracy, residual sits at the noise floor, degeneracy is detected |
+| `scripts/run_all.sh` | Every expected artifact exists, is non-empty, and every run finished cleanly |
+| `scripts/verify_ros.sh` | Plugin registration, URDF expansion, message generation, launch parsing |
 
-The path-continuity check exists because an early version of the staircase
-scenario emitted a path that jumped backwards by 1.15 m at one corner. Both
-controllers stalled there, and it looked exactly like a controller defect. A
-comparison is only worth reporting if the reference trajectories are sound, so
-they are checked rather than assumed.
+Most of these exist because of a bug they caught.
+
+- **Path continuity**: an early staircase generator emitted a path that jumped
+  backwards 1.15 m at one corner. Both controllers stalled there and it looked
+  exactly like a controller defect.
+- **Parameter files**: the EKF covariance matrices mixed `0` and `0.02`. ROS 2
+  rejects a parameter sequence that is not homogeneous, so the whole file failed
+  to load, `ekf_node` died at startup, and the only visible symptom was a
+  disconnected TF tree.
+- **Speed survives a replan**: `setPath()` used to reset the speed limiter, so
+  every republished plan ramped the robot up from zero again. Only visible under
+  Gazebo, where plans are republished; the benchmark installs a path once.
+- **Artifact verification**: a pipeline that runs to completion is not the same
+  as one that produced the results it claims. `run_all.sh` checks the files
+  exist and are non-empty rather than trusting the console output.
+
+## What running the real simulator caught
+
+Three defects were structurally invisible to the offline benchmark and only
+appeared under Gazebo:
+
+1. A **spawn race** — `spawn_entity` gave up after its default 30 s while
+   gzserver was still starting cold, so the robot never appeared. Everything
+   downstream ran happily against an empty world and the run produced no data,
+   silently dropping one controller from the comparison.
+2. A **wall-clock timer under simulated time** — `create_wall_timer` does not
+   follow the sim clock, so the control rate no longer matched the rate the
+   robot experienced.
+3. The **`setPath` speed reset** above, which made Pure Pursuit look like the
+   worse controller for reasons unconnected to its control law: its control
+   effort was 10.5 rad/s² before the fix and 0.44 rad/s² after.
+
+This is the argument for keeping the heavyweight simulation around even though
+the headline numbers come from the fast benchmark.

@@ -12,7 +12,12 @@ Example:
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription,
+    RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -29,6 +34,22 @@ def generate_launch_description():
     x_pose = LaunchConfiguration("x")
     y_pose = LaunchConfiguration("y")
     yaw_pose = LaunchConfiguration("yaw")
+
+    # The recorder decides when the run is over: it exits once the controller
+    # has reported the goal and the robot has settled.
+    metrics_recorder = Node(
+        package="shuttle_control",
+        executable="metrics_recorder_node",
+        name="metrics_recorder",
+        output="screen",
+        parameters=[{
+            "controller": controller,
+            "scenario": scenario,
+            "target_speed": speed,
+            "output_dir": output_dir,
+            "use_sim_time": True,
+        }],
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument("controller", default_value="pure_pursuit",
@@ -104,19 +125,7 @@ def generate_launch_description():
             remappings=[("odom", "/odometry/filtered")],
         ),
 
-        Node(
-            package="shuttle_control",
-            executable="metrics_recorder_node",
-            name="metrics_recorder",
-            output="screen",
-            parameters=[{
-                "controller": controller,
-                "scenario": scenario,
-                "target_speed": speed,
-                "output_dir": output_dir,
-                "use_sim_time": True,
-            }],
-        ),
+        metrics_recorder,
 
         Node(
             package="shuttle_localisation",
@@ -127,5 +136,19 @@ def generate_launch_description():
                 "output_csv": "results/gazebo/ekf_evaluation.csv",
                 "use_sim_time": True,
             }],
+        ),
+
+        # End the run as soon as the recorder is done.
+        #
+        # Without this, nothing tells the launch the experiment is finished: the
+        # other nodes keep running and the wrapper script's timeout eventually
+        # kills everything. That wastes the whole remaining timeout on every
+        # run, and the shutdown then arrives as a hard signal partway through
+        # the EKF evaluator's write, which is how its results were being lost.
+        RegisterEventHandler(
+            OnProcessExit(
+                target_action=metrics_recorder,
+                on_exit=[EmitEvent(event=Shutdown(reason="run complete"))],
+            )
         ),
     ])

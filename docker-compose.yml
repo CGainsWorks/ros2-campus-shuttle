@@ -1,9 +1,11 @@
-# `docker compose up` reproduces the headline result.
+# `docker compose up` reproduces every result in this repository.
 #
-# The default service builds the small toolchain image, runs the controller unit
-# tests, tunes both controllers, runs the full comparison matrix and regenerates
-# the figures and docs/RESULTS.md. It needs no ROS, no Gazebo and no GPU, and
-# takes about a minute end to end.
+# The default service builds the small toolchain image and runs the whole
+# pipeline: the controller unit tests, the scenario geometry cross-check, the
+# parameter file validation, the camera-to-LiDAR calibration, the controller
+# tuning and full comparison matrix, the figures and docs/RESULTS.md -- and then
+# verifies that every expected artifact actually exists and is not empty. It
+# needs no ROS, no Gazebo and no GPU, and takes a couple of minutes.
 #
 # The heavier simulation services are opt-in via profiles, because pulling
 # ROS 2 Humble and Gazebo is a multi-gigabyte download that is not needed to
@@ -11,8 +13,19 @@
 
 services:
 
-  # --- default: the headline comparison -----------------------------------
+  # --- default: everything, verified --------------------------------------
   bench:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bench
+    image: ros2-campus-shuttle/bench:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["bash", "scripts/run_all.sh"]
+
+  # Just the controller comparison, without the tests and calibration.
+  comparison:
     build:
       context: .
       dockerfile: docker/Dockerfile.bench

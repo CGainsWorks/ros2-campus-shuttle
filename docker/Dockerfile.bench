@@ -35,4 +35,4 @@ RUN cmake -S src/shuttle_control/core -B /build \
 
 ENV PATH="/build:${PATH}"
 
-CMD ["/bin/bash", "scripts/run_bench.sh"]
+CMD ["/bin/bash", "scripts/run_all.sh"]

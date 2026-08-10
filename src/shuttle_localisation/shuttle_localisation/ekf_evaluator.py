@@ -108,10 +108,24 @@ class EkfEvaluator(Node):
         var_y = max(cov[7], 1e-9)
         var_yaw = max(cov[35], 1e-9)
 
-        # NEES for the (x, y, yaw) sub-state, treating the axes as independent.
-        # For 3 degrees of freedom the expected value is 3.0 if the filter's
-        # covariance is honest.
-        nees = dx * dx / var_x + dy * dy / var_y + dyaw * dyaw / var_yaw
+        # Normalised estimation error squared, split between position and
+        # heading. Expected value equals the number of degrees of freedom (2 for
+        # position, 1 for heading) when the covariance is honest.
+        #
+        # Read these with care against a local, odom-frame filter. That instance
+        # fuses body-frame velocities and yaw rate only -- no absolute position
+        # and no absolute heading -- so x, y AND yaw are all unobservable and
+        # every pose covariance grows without bound. The filter is being honest
+        # about not knowing where it is, but the consequence is that NEES tends
+        # to zero simply because the reported uncertainty is enormous, whatever
+        # the actual error. Both figures are uninformative for that instance;
+        # judge it by the drift statistics instead.
+        #
+        # NEES becomes meaningful for the global filter, where AMCL supplies
+        # absolute x, y and yaw and the covariances stay bounded.
+        nees_pos = dx * dx / var_x + dy * dy / var_y
+        nees_yaw = dyaw * dyaw / var_yaw
+        nees = nees_pos + nees_yaw
 
         self.rows.append({
             "t": t,
@@ -124,6 +138,8 @@ class EkfEvaluator(Node):
             "std_y": math.sqrt(var_y),
             "std_yaw": math.sqrt(var_yaw),
             "nees": nees,
+            "nees_pos": nees_pos,
+            "nees_yaw": nees_yaw,
         })
 
     def report(self) -> None:
@@ -168,21 +184,40 @@ class EkfEvaluator(Node):
 
         pos = [r["err_pos"] for r in self.rows]
         yaw = [abs(r["err_yaw"]) for r in self.rows]
-        nees = [r["nees"] for r in self.rows]
         n = len(pos)
 
         def rms(values):
             return math.sqrt(sum(v * v for v in values) / len(values))
 
-        mean_nees = sum(nees) / n
+        def mean(key):
+            return sum(r[key] for r in self.rows) / n
+
+        std_x = mean("std_x")
+        nees_yaw = mean("nees_yaw")
+
+        note = ""
+        if std_x > 1.0:
+            note = (
+                "\n  note           : the reported position uncertainty is "
+                f"{std_x:.1f} m. This filter fuses velocities and yaw rate "
+                "only, so absolute position AND heading are unobservable and "
+                "every pose covariance grows without bound. Both NEES figures "
+                "are uninformative here by construction -- they tend to zero "
+                "because the reported uncertainty is enormous, whatever the "
+                "actual error. Judge this instance by the drift statistics "
+                "above; NEES becomes meaningful for the global filter, where "
+                "AMCL supplies an absolute fix."
+            )
+
         self.get_logger().info(
             f"EKF vs ground truth over {n} samples "
             f"(mean pairing error {self.pair_dt_sum / n * 1000:.1f} ms, "
             f"{self.rejected} unpaired):\n"
             f"  position error : RMS {rms(pos):.4f} m, max {max(pos):.4f} m\n"
-            f"  heading error  : RMS {rms(yaw):.4f} rad, max {max(yaw):.4f} rad\n"
-            f"  mean NEES      : {mean_nees:.2f} (3.0 = covariance consistent; "
-            f"much higher means the filter is overconfident)\n"
+            f"  heading error  : RMS {rms(yaw):.5f} rad, max {max(yaw):.5f} rad\n"
+            f"  heading NEES   : {nees_yaw:.2f} (1.0 = covariance consistent; "
+            f"much higher means overconfident, much lower means conservative)\n"
+            f"  position NEES  : {mean('nees_pos'):.2f}{note}\n"
             f"  wrote {self.output_csv}"
         )
 

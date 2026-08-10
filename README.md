@@ -67,14 +67,18 @@ by hand.
 docker compose up
 ```
 
-That builds a small Debian image, runs the controller unit tests, tunes both
-controllers by grid search, runs all 84 comparison runs, and regenerates every
-figure and `docs/RESULTS.md`. It takes about a minute, and needs no ROS, no
-Gazebo and no GPU.
+That builds a small Debian image and runs the whole pipeline: the controller
+unit tests, the scenario geometry cross-check, the parameter file validation,
+the camera-to-LiDAR calibration, the gain tuning, all 84 comparison runs, and
+every figure and `docs/RESULTS.md`. It then **verifies** that each expected
+artifact exists and is non-empty, that all 84 runs finished cleanly, and that
+there is one time series per run. No ROS, no Gazebo, no GPU.
 
-Every number in this README comes out of that command.
+Every number in this README comes out of that command. It ends with
+`END-TO-END PASSED`, or a non-zero exit.
 
 ```bash
+docker compose run --rm comparison    # just the controller comparison
 docker compose run --rm test          # all checks that don't need ROS
 docker compose run --rm calibration   # camera-to-LiDAR extrinsics
 ```
@@ -188,26 +192,46 @@ docker compose --profile sim run --rm gazebo-comparison
 
 ### What the Gazebo cross-check showed
 
-On the `corner` route at 1.0 m/s, both controllers reach the goal:
+On the `corner` route at 1.0 m/s, both controllers reach the goal (99.7% and
+99.8% of the path):
 
 | | Pure Pursuit | Stanley |
 | --- | ---: | ---: |
-| RMS cross-track | 0.108 m | 0.097 m |
-| Max cross-track | 0.231 m | 0.201 m |
-| Control effort | 0.44 rad/s² | 0.64 rad/s² |
+| RMS cross-track | 0.102 m | 0.098 m |
+| Max cross-track | 0.228 m | 0.200 m |
+| Control effort | 0.38 rad/s² | 0.60 rad/s² |
 
 Two honest caveats, and they matter more than the ranking:
 
-- **The errors are ~25× the benchmark's, and the ordering flips.** The bench has
-  Pure Pursuit three times tighter on this route; Gazebo has Stanley slightly
-  ahead. These are not measuring the same thing. The comparison runs use a
-  static `map -> odom` transform with AMCL disabled, so the controller drives on
-  dead-reckoned odometry while the error is scored against ground truth. Roughly
-  0.1 m over a 22.7 m route is about 0.4% of distance — consistent with
-  odometry drift rather than with the control law. **Treat the bench numbers as
-  the controller comparison and these as a system-level sanity check.**
-- **A single route at a single speed is not a comparison.** It is one point,
-  run once. The bench result rests on 84 runs.
+- **The errors are ~25× the benchmark's, and the ordering flips** — because
+  they are not measuring the same thing. The comparison runs use a static
+  `map -> odom` with AMCL disabled, so the controller drives on dead-reckoned
+  odometry while error is scored against ground truth. The EKF evaluator
+  measures that drift directly over the same run:
+
+  | EKF against Gazebo ground truth | |
+  | --- | ---: |
+  | Position error (RMS) | 0.137 m |
+  | Position error (max) | 0.294 m |
+  | Heading error (RMS) | 0.0033 rad |
+
+  **The localisation drift (0.137 m) is larger than the entire measured
+  tracking error (~0.10 m).** So the Gazebo figures are dominated by odometry
+  drift, not by the control law. Treat the bench numbers as the controller
+  comparison and these as a system-level sanity check.
+- **A single route at a single speed is not a comparison**, and unlike the
+  benchmark, Gazebo runs are not bit-reproducible — repeat runs move these
+  figures by a few percent. The bench result rests on 84 deterministic runs.
+
+The evaluator also reports NEES for covariance consistency. Both its position
+and heading NEES come out at ~0 here, which is not a defect in the filter: this
+instance fuses body-frame velocities and yaw rate only, so absolute position
+*and* absolute heading are unobservable and every pose covariance grows without
+bound. NEES then tends to zero simply because the reported uncertainty is
+enormous — it reports tens of metres while being accurate to centimetres. The
+evaluator prints that caveat alongside the number rather than leaving a reader
+to interpret a suspicious zero. NEES becomes meaningful for the global filter,
+where AMCL supplies an absolute fix.
 
 Running this is what surfaced three bugs the offline benchmark structurally
 could not: a spawn race that silently dropped one controller from the results, a
@@ -224,10 +248,11 @@ plugins in `config/nav2_params.yaml` under the ids `FollowPath` and
 
 | Test | Covers |
 | --- | --- |
-| `test_core` (C++, 142 checks) | Path geometry, projection sign conventions, speed limiter, plant integration, steering signs, determinism, path continuity |
+| `test_core` (C++, 145 checks) | Path geometry, projection sign conventions, speed limiter, plant integration, steering signs, determinism, path continuity, speed survives a replan |
 | `tests/test_scenarios_match.py` | The C++ and Python scenario generators agree (currently to under a micrometre) |
 | `tests/test_calibration.py` | Calibration accuracy, residual at the noise floor, degeneracy detection |
 | `tests/test_param_files.py` | Every ROS 2 parameter file will actually load |
+| `scripts/run_all.sh` | Every expected artifact exists, is non-empty, and all 84 runs finished cleanly |
 | `scripts/verify_ros.sh` | Plugin registration, URDF expansion, message generation, launch-file parsing |
 
 The path-continuity check exists for a reason. An early version of the
@@ -271,14 +296,11 @@ Stated plainly, because they bound what the numbers mean.
 - **The LiDAR is 2D.** One horizontal plane at 0.32 m. Fine for a supervised
   demonstration, not sufficient for operating unsupervised around people. See
   [docs/SAFETY.md](docs/SAFETY.md).
-- **The EKF ground-truth evaluator is not verified end to end.** The node runs,
-  subscribes and computes position, heading and NEES errors, and two bugs found
-  along the way are fixed (a pairing tolerance of exactly one sample period, and
-  a second SIGINT killing the write mid-`makedirs`). But I have not yet observed
-  it successfully emit `ekf_evaluation.csv` from a full comparison run, so
-  treat the EKF validation as implemented-but-unconfirmed, unlike the controller
-  comparison and the calibration, both of which are backed by output in this
-  repository.
+- **The EKF is validated only against dead reckoning, not against AMCL.** The
+  evaluator works and its numbers are quoted above, but the comparison runs
+  disable AMCL, so what is measured is the local filter's drift. The global
+  `map`-frame filter that fuses the AMCL pose is configured and launched by
+  `nav2.launch.py`, but its accuracy is not quantified here.
 - **MuJoCo is not implemented.** The original brief listed it alongside Gazebo;
   a second physics engine adds no evidence the comparison needs, so the effort
   went into the ROS-free benchmark instead.
@@ -305,6 +327,7 @@ tests/
 ## Documentation
 
 - **[docs/RESULTS.md](docs/RESULTS.md)** — full comparison, generated from the data
+- **[docs/RESULTS_GAZEBO.md](docs/RESULTS_GAZEBO.md)** — the Gazebo cross-check, generated the same way
 - **[docs/CONTROLLERS.md](docs/CONTROLLERS.md)** — the maths, the diff-drive Stanley adaptation, tuning
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — packages, frames, how a run works
 - **[docs/SAFETY.md](docs/SAFETY.md)** — hazards, mitigations, what is not simulated
