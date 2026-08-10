@@ -336,6 +336,54 @@ void testPathContinuity()
   }
 }
 
+/// Re-installing a plan must not throw away the speed the robot already has.
+///
+/// This is a regression test for a bug found only by running the stack in
+/// Gazebo. The path publisher repeats its latched plan once a second and Nav2
+/// republishes on every planner cycle. setPath() used to reset the speed
+/// limiter, so the acceleration rate limit ramped the robot up from zero again
+/// on every plan message. The commanded speed sawtoothed between 0 and 0.8 m/s
+/// and the robot averaged a third of its target speed.
+void testSetPathPreservesSpeed()
+{
+  TEST_CASE("re-setting the same plan does not reset the commanded speed");
+  const Path p = straightPath(40.0, 1.0);
+
+  PurePursuit tracker;
+  tracker.common().speed.v_max = 1.0;
+  tracker.common().speed.a_lon_max = 0.8;
+  tracker.common().search_window = 120;
+  tracker.setPath(p);
+
+  VehicleState s;
+  s.pose = Pose2D{0.0, 0.0, 0.0};
+  s.v = 0.0;
+
+  // Drive for two seconds so the speed limiter has ramped up.
+  double v_cmd = 0.0;
+  for (int i = 0; i < 40; ++i) {
+    const Twist2D cmd = tracker.computeCommand(s, 0.05);
+    v_cmd = cmd.v;
+    s.pose.x += cmd.v * 0.05;
+    s.v = cmd.v;
+  }
+  CHECK(v_cmd > 0.9);
+
+  // The identical plan arrives again, as a latched republish would deliver it.
+  tracker.setPath(p);
+  const Twist2D after = tracker.computeCommand(s, 0.05);
+
+  std::cout << "    before " << v_cmd << " m/s, after re-setPath "
+            << after.v << " m/s\n";
+  // One acceleration step of slack, no more. A reset would give ~0.04 m/s.
+  CHECK(after.v > v_cmd - 0.8 * 0.05 - 1e-9);
+
+  TEST_CASE("explicit reset() does clear the speed");
+  tracker.reset();
+  const Twist2D restarted = tracker.computeCommand(s, 0.05);
+  CHECK(restarted.v <= 0.8 * 0.05 + 1e-9);
+}
+
 void testDeterminism()
 {
   TEST_CASE("a run is bit-for-bit repeatable");
@@ -368,6 +416,7 @@ int main()
   testMetrics();
   testSteeringSigns();
   testPathContinuity();
+  testSetPathPreservesSpeed();
   testConvergence();
   testDeterminism();
 

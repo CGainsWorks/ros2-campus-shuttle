@@ -41,7 +41,25 @@ double SpeedLimiter::compute(double v_ref, double kappa, double dist_to_goal, do
 void PathTracker::setPath(const Path & path)
 {
   path_ = path;
-  reset();
+  hint_ = 0;
+  goal_reached_ = false;
+  last_error_ = TrackingError{};
+  speed_limiter_.setLimits(common_.speed);
+
+  // The speed limiter's state is deliberately NOT reset here.
+  //
+  // A new plan almost always arrives while the robot is already moving: Nav2
+  // republishes a plan every planner cycle, and a latched plan is re-delivered
+  // to every new subscriber. Resetting the limiter would set the previous
+  // commanded speed back to zero, so the acceleration rate limit would ramp
+  // the robot up from a standstill again on every plan message.
+  //
+  // The effect is not subtle. With a plan republished at 1 Hz and a limit of
+  // 0.8 m/s^2, the commanded speed sawtooths between 0 and 0.8 m/s and the
+  // robot averages about a third of its target speed -- which then drags the
+  // Pure Pursuit lookahead down to its floor and makes it oscillate.
+  //
+  // Call reset() explicitly for a genuine restart.
 }
 
 void PathTracker::reset()

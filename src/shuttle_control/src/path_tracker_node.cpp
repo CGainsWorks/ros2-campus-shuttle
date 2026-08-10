@@ -124,6 +124,23 @@ private:
       xs.push_back(p.pose.position.x);
       ys.push_back(p.pose.position.y);
     }
+    // A latched plan is redelivered on every reconnection and the comparison
+    // publisher repeats it once a second. Re-installing an identical path would
+    // churn the tracker's state for no reason, so ignore repeats.
+    if (have_plan_ && msg->poses.size() == last_plan_size_ &&
+      std::fabs(xs.front() - last_plan_first_x_) < 1e-9 &&
+      std::fabs(ys.front() - last_plan_first_y_) < 1e-9 &&
+      std::fabs(xs.back() - last_plan_last_x_) < 1e-9 &&
+      std::fabs(ys.back() - last_plan_last_y_) < 1e-9)
+    {
+      return;
+    }
+    last_plan_size_ = msg->poses.size();
+    last_plan_first_x_ = xs.front();
+    last_plan_first_y_ = ys.front();
+    last_plan_last_x_ = xs.back();
+    last_plan_last_y_ = ys.back();
+
     tracker_->setPath(Path::fromPolyline(xs, ys, tracker_->common().speed.v_max));
     have_plan_ = true;
     RCLCPP_INFO(
@@ -237,6 +254,11 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 
   bool have_plan_{false};
+  std::size_t last_plan_size_{0};
+  double last_plan_first_x_{0.0};
+  double last_plan_first_y_{0.0};
+  double last_plan_last_x_{0.0};
+  double last_plan_last_y_{0.0};
   bool have_odom_{false};
   bool announced_goal_{false};
   double measured_v_{0.0};

@@ -26,6 +26,12 @@ RunResult runScenario(PathTracker & tracker, const Scenario & scenario, const Ru
   plant.reset(scenario.start, config.seed);
 
   tracker.setPath(scenario.path);
+  // A benchmark run is a genuine restart, not a mid-flight replan, so clear the
+  // speed limiter as well. setPath() deliberately preserves it (see the note
+  // there), and the tuning sweep reuses one tracker across scenarios, so
+  // without this a run would inherit the previous run's commanded speed and
+  // results would depend on the order they were executed in.
+  tracker.reset();
 
   const double control_dt = 1.0 / config.control_rate;
   const double physics_dt = 1.0 / config.physics_rate;
