@@ -11,7 +11,7 @@ Pure Pursuit tracks curvature more closely, winning 5 of the 5 steady-state rout
 - Both controllers drive the **same** reference paths from the **same** start poses at the **same** speeds.
 - The longitudinal (speed) law is shared code. Only the lateral control law differs, so a difference in tracking error cannot be explained by one controller simply taking corners slower.
 - Cross-track error is reported at `base_link` for both, even though Stanley internally regulates the error at a virtual front axle.
-- Errors are measured against **ground truth**, not against the noisy pose the controller was given.
+- Errors are measured against **ground truth**, not against the pose the controller was given.
 - The odometry noise sequence is seeded from the scenario, speed and noise setting only, never from the controller, so both face an identical disturbance realisation.
 - A 100 ms sensing latency is modelled, because without it the tuning step selects gains that are only optimal in a perfect world.
 - Gains are fitted by grid search on `campus_loop`, `circle`, `corner`, `straight_offset` and reported on all scenarios, so the held-out routes test generalisation.

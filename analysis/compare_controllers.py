@@ -474,20 +474,37 @@ def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir,
             "though Stanley internally regulates the error at a virtual front "
             "axle.\n"
             "- Errors are measured against **ground truth**, not against the "
-            "noisy pose the controller was given.\n"
-            "- The odometry noise sequence is seeded from the scenario, speed "
-            "and noise setting only, never from the controller, so both face "
-            "an identical disturbance realisation.\n"
-            "- A 100 ms sensing latency is modelled, because without it the "
-            "tuning step selects gains that are only optimal in a perfect "
-            "world.\n"
-            "- Gains are fitted by grid search on "
-            f"{', '.join('`' + s + '`' for s in sorted(TUNING_SET))} and "
-            "reported on all scenarios, so the held-out routes test "
-            "generalisation.\n\n"
+            "pose the controller was given.\n"
         )
+        if gazebo:
+            f.write(
+                "- Both controllers face the same world, the same latched "
+                "plan and the same start pose. Sensor noise and sensing "
+                "latency are whatever the simulator and the ROS transport "
+                "produce, not a model, and are therefore **not** identical "
+                "between runs.\n"
+                "- Gains are the ones fitted offline; nothing is tuned here.\n"
+                "\n"
+            )
+        else:
+            f.write(
+                "- The odometry noise sequence is seeded from the scenario, "
+                "speed and noise setting only, never from the controller, so "
+                "both face an identical disturbance realisation.\n"
+                "- A 100 ms sensing latency is modelled, because without it "
+                "the tuning step selects gains that are only optimal in a "
+                "perfect world.\n"
+                "- Gains are fitted by grid search on "
+                f"{', '.join('`' + s + '`' for s in sorted(TUNING_SET))} and "
+                "reported on all scenarios, so the held-out routes test "
+                "generalisation.\n\n"
+            )
 
-        f.write(f"## Per-scenario, at {speed:g} m/s, no noise\n\n")
+        # Say honestly which rows the table is built from: a Gazebo result set
+        # has no noise-free counterpart to select.
+        has_clean = not df[(df.target_speed == speed) & (df.noise == 0)].empty
+        condition = "no noise" if has_clean else "as recorded"
+        f.write(f"## Per-scenario, at {speed:g} m/s, {condition}\n\n")
         f.write(scenario_table(df, speed) + "\n\n")
 
         transients = transient_table(df, ts_dir)
