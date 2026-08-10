@@ -197,36 +197,40 @@ docker compose --profile sim run --rm gazebo-comparison
 
 ### What the Gazebo cross-check showed
 
-On the `corner` route at 1.0 m/s, both controllers reach the goal (99.7% and
-99.8% of the path):
+On the `corner` route at 1.0 m/s, both controllers reach the goal every time.
+Across three independent repeats:
 
-| | Pure Pursuit | Stanley |
+| RMS cross-track | Pure Pursuit | Stanley |
 | --- | ---: | ---: |
-| RMS cross-track | 0.102 m | 0.098 m |
-| Max cross-track | 0.228 m | 0.200 m |
-| Control effort | 0.38 rad/s² | 0.60 rad/s² |
+| repeat 1 | 0.1020 m | 0.0979 m |
+| repeat 2 | 0.1025 m | 0.0969 m |
+| repeat 3 | 0.1019 m | 0.1033 m |
 
-Two honest caveats, and they matter more than the ranking:
+**Gazebo does not separate these two controllers on this route.** Pure Pursuit
+is remarkably repeatable (0.1019–0.1025 m, a 0.6% spread); Stanley varies more
+(0.0969–0.1033 m, 6.6%), enough that the ranking flips between repeats. The gap
+between the controllers is smaller than Stanley's own run-to-run variation, so
+any single Gazebo run "showing" a winner here is noise. This is precisely why
+the headline comparison is the deterministic benchmark, where the same inputs
+give bit-identical outputs and an 84-run matrix backs the conclusion.
 
-- **The errors are ~25× the benchmark's, and the ordering flips** — because
-  they are not measuring the same thing. The comparison runs use a static
-  `map -> odom` with AMCL disabled, so the controller drives on dead-reckoned
-  odometry while error is scored against ground truth. The EKF evaluator
-  measures that drift directly over the same run:
+Why the errors are ~25× the benchmark's: they are not measuring the same thing.
+The comparison runs use a static `map -> odom` with AMCL disabled, so the
+controller drives on dead-reckoned odometry while error is scored against
+ground truth. The EKF evaluator measures that drift directly over the same runs:
 
-  | EKF against Gazebo ground truth | |
-  | --- | ---: |
-  | Position error (RMS) | 0.137 m |
-  | Position error (max) | 0.294 m |
-  | Heading error (RMS) | 0.0033 rad |
+| EKF against Gazebo ground truth | across all repeats |
+| --- | ---: |
+| Position error (RMS) | 0.131 – 0.141 m |
+| Position error (max) | 0.285 – 0.300 m |
+| Heading error (RMS) | 0.0029 – 0.0065 rad |
 
-  **The localisation drift (0.137 m) is larger than the entire measured
-  tracking error (~0.10 m).** So the Gazebo figures are dominated by odometry
-  drift, not by the control law. Treat the bench numbers as the controller
-  comparison and these as a system-level sanity check.
-- **A single route at a single speed is not a comparison**, and unlike the
-  benchmark, Gazebo runs are not bit-reproducible — repeat runs move these
-  figures by a few percent. The bench result rests on 84 deterministic runs.
+**The localisation drift (~0.135 m) is larger than the entire measured tracking
+error (~0.10 m).** So the Gazebo figures are dominated by odometry drift rather
+than by the control law — which is the other reason they cannot rank the two
+controllers. Treat the bench numbers as the controller comparison and these as
+a system-level sanity check: the stack drives the route, the localisation drifts
+about as much as you would expect from dead reckoning, and nothing diverges.
 
 The evaluator also reports NEES for covariance consistency. Both its position
 and heading NEES come out at ~0 here, which is not a defect in the filter: this
