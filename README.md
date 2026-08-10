@@ -77,6 +77,11 @@ there is one time series per run. No ROS, no Gazebo, no GPU.
 Every number in this README comes out of that command. It ends with
 `END-TO-END PASSED`, or a non-zero exit.
 
+The benchmark is deterministic: running it on a fresh clone regenerates every
+committed artifact — `docs/RESULTS.md`, all four figures, the tuned gains and
+the calibration — **byte for byte identical**, so `git status` comes back clean
+afterwards. (The Gazebo cross-check is not deterministic; see below.)
+
 ```bash
 docker compose run --rm comparison    # just the controller comparison
 docker compose run --rm test          # all checks that don't need ROS
