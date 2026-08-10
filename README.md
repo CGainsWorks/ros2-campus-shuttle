@@ -29,14 +29,19 @@ which failed to finish:
 
 **Neither controller wins outright, and that is the finding.**
 
-- **Stanley converges faster from an initial error.** On the two transient
-  scenarios it settles sooner, because it feeds back heading error and
-  cross-track error explicitly. On the 30° heading step it is roughly 4× closer
-  to the line through the transient.
 - **Pure Pursuit holds a line far better once on it.** On every curved route it
   is 3–10× tighter. On a constant-radius arc its commanded curvature equals
   `1/R` *exactly* — the geometry is not an approximation there — which is why
   `circle` comes out at 0.1 mm.
+- **Stanley re-acquires a path more gracefully.** It carries a lower RMS error
+  through both step scenarios and, more usefully, **gets onto the line without
+  overshooting it**. Recovering from a 30° heading error it never leaves a 5 cm
+  band, while Pure Pursuit swings 8.3 cm past the path before settling.
+- **The two trade settling time against overshoot.** From a 1 m lateral offset
+  at 1.5 m/s, Pure Pursuit is inside 5 cm after 1.07 m but overshoots by
+  3.6 cm; Stanley takes 3.45 m to get inside that band but overshoots only
+  0.9 cm. RMS alone hides this, so `docs/RESULTS.md` reports settling distance
+  and overshoot separately.
 - **Stanley overshoots at corner exits.** Visible as the ±2 cm ringing on
   `campus_loop` and ±4.5 cm on `sharp_turns` in the figure below, against Pure
   Pursuit's ±0.5 cm. It regulates error at a virtual front axle, so it commits
@@ -47,7 +52,8 @@ which failed to finish:
 
 So: **Pure Pursuit for route following, Stanley if the robot is frequently
 re-acquiring a path** — after a replan, a manual takeover, or a localisation
-jump.
+jump — and particularly where overshooting the path is worse than taking longer
+to reach it, which on a pedestrian campus it usually is.
 
 ![Trajectories and tracking error](analysis/figures/trajectories.png)
 

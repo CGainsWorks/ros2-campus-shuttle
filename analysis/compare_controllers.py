@@ -262,6 +262,58 @@ def scenario_table(df, speed) -> str:
     return "\n".join(lines)
 
 
+def transient_metrics(ts: pd.DataFrame, band: float = 0.05) -> dict:
+    """Settling distance and overshoot for a step-response run.
+
+    RMS alone is misleading on a step: a controller that sheds most of the error
+    quickly and then creeps in can beat one that reaches the tight band sooner
+    but overshoots. Both behaviours matter, so both are reported.
+
+    settle  : distance travelled before |error| stays inside `band` for good
+    overshoot: furthest excursion past the path, opposite the starting side
+    """
+    err = ts.cross_track
+    outside = ts.s[err.abs() > band]
+    settle = float(outside.max()) if len(outside) else 0.0
+
+    start_sign = 1.0 if err.iloc[0] >= 0 else -1.0
+    overshoot = float((-start_sign * err).max())
+    if overshoot <= 0.0:
+        overshoot = 0.0  # never crossed the path; avoid reporting "-0.0"
+    return {"settle": settle, "overshoot": overshoot}
+
+
+def transient_table(df, ts_dir) -> str:
+    """Step-response behaviour, measured from the time series."""
+    scenarios = [s for s in ("straight_offset", "heading_offset")
+                 if s in set(df.scenario)]
+    if not scenarios:
+        return ""
+
+    lines = [
+        "| Scenario | Speed | PP settles within 5 cm | Stanley settles | "
+        "PP overshoot | Stanley overshoot |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for scenario in scenarios:
+        for speed in sorted(df[df.scenario == scenario].target_speed.unique()):
+            cells = {}
+            for ctrl in CONTROLLERS:
+                ts = load_timeseries(ts_dir, ctrl, scenario, speed, False)
+                if ts is None:
+                    continue
+                cells[ctrl] = transient_metrics(ts)
+            if len(cells) < 2:
+                continue
+            pp, st = cells["pure_pursuit"], cells["stanley"]
+            lines.append(
+                f"| `{scenario}` | {speed:g} m/s | {pp['settle']:.2f} m | "
+                f"{st['settle']:.2f} m | {100 * pp['overshoot']:.1f} cm | "
+                f"{100 * st['overshoot']:.1f} cm |"
+            )
+    return "\n".join(lines)
+
+
 def speed_table(df) -> str:
     lines = [
         "| Speed (m/s) | Noise | PP RMS (m) | Stanley RMS (m) | PP effort | "
@@ -323,15 +375,16 @@ def build_verdict(df, speed) -> tuple[str, dict]:
     verdict = (
         f"Pure Pursuit tracks curvature more closely, winning "
         f"{len(steady_wins_pp)} of the {steady_total} steady-state routes. "
-        f"Stanley recovers from an initial error faster, winning "
-        f"{len(transient_wins_st)} of the {len(transient)} transient scenarios. "
-        "Neither controller dominates: the choice depends on whether the "
-        "robot spends its time settling or holding a line."
+        f"Stanley holds a lower RMS error through the transient on "
+        f"{len(transient_wins_st)} of the {len(transient)} step scenarios, and "
+        "reaches the path without overshooting where Pure Pursuit overshoots. "
+        "Neither controller dominates: the choice depends on whether the robot "
+        "spends its time re-acquiring a path or holding one."
     )
     return verdict, stats
 
 
-def write_results(path, df, verdict, stats, figures, speed, gains_text):
+def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     n_runs = len(df)
     failures = int(((df.diverged == 1) | (df.stalled == 1) |
@@ -374,6 +427,19 @@ def write_results(path, df, verdict, stats, figures, speed, gains_text):
 
         f.write(f"## Per-scenario, at {speed:g} m/s, no noise\n\n")
         f.write(scenario_table(df, speed) + "\n\n")
+
+        transients = transient_table(df, ts_dir)
+        if transients:
+            f.write("## Step response\n\n")
+            f.write(
+                "RMS alone is misleading on a step. A controller that sheds "
+                "most of the error quickly and then creeps in can beat one "
+                "that reaches the tight band sooner but overshoots, so "
+                "settling distance and overshoot are reported separately. "
+                "`settles` is the distance travelled before the error stays "
+                "inside 5 cm; `overshoot` is the furthest excursion past the "
+                "path on the far side.\n\n")
+            f.write(transients + "\n\n")
 
         f.write("## Across speed and noise (averaged over all scenarios)\n\n")
         f.write(speed_table(df) + "\n\n")
@@ -450,7 +516,8 @@ def main() -> int:
             gains_text = fh.read()
 
     verdict, stats = build_verdict(df, speed)
-    write_results(args.results, df, verdict, stats, figures, speed, gains_text)
+    write_results(args.results, df, verdict, stats, figures, speed, gains_text,
+                  args.timeseries)
 
     print(verdict)
     for ctrl in CONTROLLERS:
