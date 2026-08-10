@@ -271,6 +271,14 @@ Stated plainly, because they bound what the numbers mean.
 - **The LiDAR is 2D.** One horizontal plane at 0.32 m. Fine for a supervised
   demonstration, not sufficient for operating unsupervised around people. See
   [docs/SAFETY.md](docs/SAFETY.md).
+- **The EKF ground-truth evaluator is not verified end to end.** The node runs,
+  subscribes and computes position, heading and NEES errors, and two bugs found
+  along the way are fixed (a pairing tolerance of exactly one sample period, and
+  a second SIGINT killing the write mid-`makedirs`). But I have not yet observed
+  it successfully emit `ekf_evaluation.csv` from a full comparison run, so
+  treat the EKF validation as implemented-but-unconfirmed, unlike the controller
+  comparison and the calibration, both of which are backed by output in this
+  repository.
 - **MuJoCo is not implemented.** The original brief listed it alongside Gazebo;
   a second physics engine adds no evidence the comparison needs, so the effort
   went into the ROS-free benchmark instead.

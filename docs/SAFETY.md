@@ -18,7 +18,7 @@ carrying no passengers, always within line of sight of a trained operator.
 | Collision with a pedestrian | Perception misses a low or thin obstacle; 2D LiDAR sees one horizontal slice only | Speed limited to 1.5 m/s; Nav2 inflation radius 0.65 m against a 0.55 m robot radius; operator supervision | 2D-only sensing is a real limitation, see below |
 | Collision with a static obstacle | Localisation drift; costmap not updated | Global costmap from a prior map plus live scan; local rolling costmap | Implemented in simulation |
 | Runaway on a control fault | Controller commands a velocity the operator cannot override | Hardware emergency stop cutting motor power, independent of software | **Hardware only, not simulated** |
-| Loss of localisation | Scan matching fails in a feature-poor area | EKF covariance monitored; `ekf_evaluator` reports NEES | Monitoring implemented; the stop-on-divergence behaviour is not |
+| Loss of localisation | Scan matching fails in a feature-poor area | EKF covariance monitored; `ekf_evaluator` reports NEES | Monitoring implemented but **not yet verified end to end**; the stop-on-divergence behaviour is not implemented at all |
 | Stale command | A node dies while the last `cmd_vel` is still being executed | The base must stop on command timeout | **Not implemented**: `gazebo_ros_diff_drive` has no command timeout, so a real base needs one in firmware |
 | Tracking failure on tight corners | Controller limit-cycles or cuts a corner | Benchmarked over seven scenarios including corners tighter than the tuning set; stalls and divergence are recorded as explicit outcomes | Implemented and tested |
 

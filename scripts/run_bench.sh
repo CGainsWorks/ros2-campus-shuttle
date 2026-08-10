@@ -13,18 +13,21 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-BENCH_BIN="${BENCH_BIN:-controller_bench}"
-TEST_BIN="${TEST_BIN:-test_core}"
 OUT_DIR="${OUT_DIR:-results/bench}"
 
-if ! command -v "$BENCH_BIN" >/dev/null 2>&1; then
-  echo "Building the controller core..."
-  cmake -S src/shuttle_control/core -B build/core \
-    -DCMAKE_BUILD_TYPE=Release -DSHUTTLE_CORE_BUILD_TESTS=ON >/dev/null
-  cmake --build build/core -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
-  BENCH_BIN="$REPO_ROOT/build/core/controller_bench"
-  TEST_BIN="$REPO_ROOT/build/core/test_core"
-fi
+# Always build from the source actually present. The Docker image prebuilds the
+# core, but the repository is bind-mounted over it at run time, so the prebuilt
+# binary can be older than the source. Publishing numbers produced by stale code
+# would defeat the point of the whole exercise.
+BUILD_DIR="${BUILD_DIR:-/tmp/shuttle-core-build}"
+
+echo "Building the controller core from source..."
+cmake -S src/shuttle_control/core -B "$BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Release -DSHUTTLE_CORE_BUILD_TESTS=ON >/dev/null
+cmake --build "$BUILD_DIR" -j"$(nproc 2>/dev/null || echo 4)" >/dev/null
+
+BENCH_BIN="$BUILD_DIR/controller_bench"
+TEST_BIN="$BUILD_DIR/test_core"
 
 mkdir -p "$OUT_DIR/timeseries"
 
