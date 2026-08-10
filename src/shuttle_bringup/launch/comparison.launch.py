@@ -48,6 +48,13 @@ def generate_launch_description():
             launch_arguments={
                 "headless": "true",
                 "rviz": "false",
+                # Obstacle-free world, deliberately. The benchmark routes are
+                # laid out in their own coordinates and several of them pass
+                # through the campus buildings; the robot then drives into a
+                # wall and the run records a stall that says nothing about the
+                # control law. Obstacle avoidance is the Nav2 demo's job.
+                "world": PathJoinSubstitution(
+                    [bringup, "worlds", "empty_test.world"]),
                 "x": x_pose,
                 "y": y_pose,
                 "yaw": yaw_pose,

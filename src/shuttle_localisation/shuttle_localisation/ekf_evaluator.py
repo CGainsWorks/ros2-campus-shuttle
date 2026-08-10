@@ -13,14 +13,12 @@ the normalised estimation error squared (NEES) is what exposes that.
 
 from __future__ import annotations
 
-import argparse
 import csv
 import math
 import os
 from collections import deque
 
 import rclpy
-from geometry_msgs.msg import PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 

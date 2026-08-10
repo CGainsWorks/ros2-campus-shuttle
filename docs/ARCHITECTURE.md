@@ -78,6 +78,14 @@ pose — a scan match against the map — rather than as raw scans.
 
 ## How the comparison run works
 
+The comparison runs in `simulation/worlds/empty_test.world`, not the furnished
+campus world. This is deliberate. The benchmark routes are laid out in their own
+coordinates and several of them pass straight through the campus buildings — the
+`corner` route's final leg runs through the library — so the robot drives into a
+wall and the run records a stall that says nothing whatever about the control
+law. Obstacle avoidance is the Nav2 demo's job; the comparison measures path
+tracking and nothing else.
+
 `scripts/run_comparison.sh` launches Gazebo once per controller. Each run:
 
 1. `path_publisher` emits the scenario path, **latched**, on `/plan`. The path
