@@ -186,6 +186,36 @@ engine, scored against the Gazebo ground-truth pose:
 docker compose --profile sim run --rm gazebo-comparison
 ```
 
+### What the Gazebo cross-check showed
+
+On the `corner` route at 1.0 m/s, both controllers reach the goal:
+
+| | Pure Pursuit | Stanley |
+| --- | ---: | ---: |
+| RMS cross-track | 0.108 m | 0.097 m |
+| Max cross-track | 0.231 m | 0.201 m |
+| Control effort | 0.44 rad/s² | 0.64 rad/s² |
+
+Two honest caveats, and they matter more than the ranking:
+
+- **The errors are ~25× the benchmark's, and the ordering flips.** The bench has
+  Pure Pursuit three times tighter on this route; Gazebo has Stanley slightly
+  ahead. These are not measuring the same thing. The comparison runs use a
+  static `map -> odom` transform with AMCL disabled, so the controller drives on
+  dead-reckoned odometry while the error is scored against ground truth. Roughly
+  0.1 m over a 22.7 m route is about 0.4% of distance — consistent with
+  odometry drift rather than with the control law. **Treat the bench numbers as
+  the controller comparison and these as a system-level sanity check.**
+- **A single route at a single speed is not a comparison.** It is one point,
+  run once. The bench result rests on 84 runs.
+
+Running this is what surfaced three bugs the offline benchmark structurally
+could not: a spawn race that silently dropped one controller from the results, a
+wall-clock timer under simulated time, and `setPath()` discarding the robot's
+speed on every republished plan. That last one made Pure Pursuit look like the
+worse controller for a reason that had nothing to do with its control law — its
+control effort was 10.5 rad/s² before the fix and 0.44 rad/s² after.
+
 Which tracker Nav2 uses is a parameter, not a rebuild: both are registered as
 plugins in `config/nav2_params.yaml` under the ids `FollowPath` and
 `StanleyPath`.
@@ -228,10 +258,10 @@ Stated plainly, because they bound what the numbers mean.
   comparison — see [docs/CONTROLLERS.md](docs/CONTROLLERS.md).
 - **The headline numbers come from a kinematic benchmark**, which models
   actuator lag, wheel saturation, sensing latency and odometry noise, but not
-  wheel slip, tyre dynamics or LiDAR mis-association. The Gazebo pipeline
-  exercises the same controller code against a physics engine and is built,
-  launched and smoke-tested; treat its output as the higher-fidelity check and
-  the bench numbers as the reproducible ones.
+  wheel slip, tyre dynamics or LiDAR mis-association. The Gazebo cross-check
+  runs and is reported above, but on one route at one speed, and its error is
+  dominated by odometry drift rather than by the control law — so it validates
+  the system, not the controller ranking.
 - **Absolute errors are small because the plant is well behaved.** The
   comparison between the two columns is the result; the magnitude of either is
   not a claim about a real vehicle.

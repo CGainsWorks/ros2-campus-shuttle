@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import math
 import os
+import signal
 from collections import deque
 
 import rclpy
@@ -40,7 +41,12 @@ class EkfEvaluator(Node):
         self.declare_parameter("output_csv", "results/gazebo/ekf_evaluation.csv")
         self.declare_parameter("truth_topic", "/ground_truth/odom")
         self.declare_parameter("estimate_topic", "/odometry/filtered")
-        self.declare_parameter("max_pair_dt", 0.05)
+        # Pairing tolerance. The filtered estimate arrives at roughly 20 Hz, so
+        # a 0.05 s gate is exactly one sample period: any lag between the two
+        # streams then rejects every pair and the evaluation silently reports
+        # nothing. Allow a few sample periods instead, and report the pairing
+        # error achieved so a poor match is visible rather than assumed away.
+        self.declare_parameter("max_pair_dt", 0.15)
 
         self.output_csv = self.get_parameter("output_csv").value
         self.max_pair_dt = float(self.get_parameter("max_pair_dt").value)
@@ -50,6 +56,9 @@ class EkfEvaluator(Node):
         # rather than assuming the two streams are aligned.
         self.truth = deque(maxlen=400)
         self.rows: list[dict] = []
+        self.rejected = 0
+        self.worst_rejected = 0.0
+        self.pair_dt_sum = 0.0
 
         self.create_subscription(
             Odometry, self.get_parameter("truth_topic").value, self.on_truth, 50)
@@ -71,8 +80,12 @@ class EkfEvaluator(Node):
         if not self.truth:
             return None
         best = min(self.truth, key=lambda s: abs(s[0] - t))
-        if abs(best[0] - t) > self.max_pair_dt:
+        dt = abs(best[0] - t)
+        if dt > self.max_pair_dt:
+            self.rejected += 1
+            self.worst_rejected = max(self.worst_rejected, dt)
             return None
+        self.pair_dt_sum += dt
         return best
 
     def on_estimate(self, msg: Odometry) -> None:
@@ -114,8 +127,37 @@ class EkfEvaluator(Node):
         })
 
     def report(self) -> None:
+        """Write the evaluation. Deliberately not interruptible.
+
+        This runs from the shutdown path, and `ros2 launch` follows its first
+        SIGINT with more signals if a process does not exit promptly. A second
+        SIGINT landing partway through the write raises KeyboardInterrupt inside
+        os.makedirs and the results are lost after the whole run has been paid
+        for. Ignoring SIGINT for the few milliseconds it takes to write is the
+        difference between having the data and not.
+        """
+        previous = signal.getsignal(signal.SIGINT)
+        try:
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+        except (ValueError, OSError):
+            previous = None  # not on the main thread; carry on regardless
+        try:
+            self._write_report()
+        finally:
+            if previous is not None:
+                try:
+                    signal.signal(signal.SIGINT, previous)
+                except (ValueError, OSError):
+                    pass
+
+    def _write_report(self) -> None:
         if not self.rows:
-            self.get_logger().warn("no paired samples, nothing to report")
+            self.get_logger().error(
+                f"no paired samples: {self.rejected} estimates had no ground "
+                f"truth within {self.max_pair_dt:.3f} s (closest miss "
+                f"{self.worst_rejected:.3f} s). Either one of the two topics "
+                f"is not publishing, or their stamps are further apart than "
+                f"the pairing tolerance allows.")
             return
 
         os.makedirs(os.path.dirname(self.output_csv) or ".", exist_ok=True)
@@ -134,7 +176,9 @@ class EkfEvaluator(Node):
 
         mean_nees = sum(nees) / n
         self.get_logger().info(
-            f"EKF vs ground truth over {n} samples:\n"
+            f"EKF vs ground truth over {n} samples "
+            f"(mean pairing error {self.pair_dt_sum / n * 1000:.1f} ms, "
+            f"{self.rejected} unpaired):\n"
             f"  position error : RMS {rms(pos):.4f} m, max {max(pos):.4f} m\n"
             f"  heading error  : RMS {rms(yaw):.4f} rad, max {max(yaw):.4f} rad\n"
             f"  mean NEES      : {mean_nees:.2f} (3.0 = covariance consistent; "
