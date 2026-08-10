@@ -28,10 +28,16 @@
     <physics type="ode">
       <max_step_size>0.002</max_step_size>
       <real_time_factor>1.0</real_time_factor>
-      <!-- 0 means "as fast as the machine allows", which matters because the
-           comparison is run headless in CI-like conditions where wall-clock
-           time is the limiting factor, not fidelity. -->
-      <real_time_update_rate>0</real_time_update_rate>
+      <!--
+        Paced to roughly real time on purpose. Setting this to 0 lets gzserver
+        run as fast as the CPU allows, and simulated time then races far ahead
+        of wall time. Any node driving itself from a wall-clock timer is
+        effectively left running open loop -- the robot receives one command
+        every several simulated seconds and wanders off the path. Nodes here use
+        sim-time timers, but the sensor plugins and the ROS transport still tie
+        this system to wall time, so pacing the physics is the honest setting.
+      -->
+      <real_time_update_rate>500</real_time_update_rate>
       <ode>
         <solver>
           <type>quick</type>

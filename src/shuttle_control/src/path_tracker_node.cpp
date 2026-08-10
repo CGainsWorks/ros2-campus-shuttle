@@ -17,6 +17,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "rclcpp/create_timer.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "shuttle_control/pure_pursuit.hpp"
 #include "shuttle_control/stanley.hpp"
@@ -94,8 +95,13 @@ public:
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       "odom", 20, std::bind(&PathTrackerNode::onOdom, this, std::placeholders::_1));
 
-    timer_ = create_wall_timer(
-      std::chrono::duration<double>(1.0 / control_rate_),
+    // A ROS-clock timer, not a wall timer. Under use_sim_time these differ:
+    // create_wall_timer always ticks on steady time, so if Gazebo runs faster
+    // or slower than real time the control rate no longer matches the rate the
+    // robot actually experiences, and the loop is effectively open.
+    timer_ = rclcpp::create_timer(
+      this, get_clock(),
+      rclcpp::Duration::from_seconds(1.0 / control_rate_),
       std::bind(&PathTrackerNode::onTimer, this));
 
     RCLCPP_INFO(
