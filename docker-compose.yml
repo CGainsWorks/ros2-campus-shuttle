@@ -1,0 +1,80 @@
+# `docker compose up` reproduces the headline result.
+#
+# The default service builds the small toolchain image, runs the controller unit
+# tests, tunes both controllers, runs the full comparison matrix and regenerates
+# the figures and docs/RESULTS.md. It needs no ROS, no Gazebo and no GPU, and
+# takes about a minute end to end.
+#
+# The heavier simulation services are opt-in via profiles, because pulling
+# ROS 2 Humble and Gazebo is a multi-gigabyte download that is not needed to
+# check the numbers.
+
+services:
+
+  # --- default: the headline comparison -----------------------------------
+  bench:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bench
+    image: ros2-campus-shuttle/bench:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["bash", "scripts/run_bench.sh"]
+
+  # --- camera-to-LiDAR calibration ----------------------------------------
+  calibration:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bench
+    image: ros2-campus-shuttle/bench:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["bash", "scripts/run_calibration.sh"]
+
+  # --- everything the bench image can check -------------------------------
+  test:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bench
+    image: ros2-campus-shuttle/bench:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["bash", "scripts/run_tests.sh"]
+
+  # --- full ROS 2 + Gazebo stack (opt in) ---------------------------------
+  # docker compose --profile sim run --rm sim
+  sim:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: ros2-campus-shuttle/sim:local
+    profiles: ["sim"]
+    working_dir: /ws
+    volumes:
+      - .:/ws
+    environment:
+      - ROS_DOMAIN_ID=42
+      # gzserver runs headless by default; set DISPLAY and switch headless:=false
+      # for the GUI.
+      - QT_X11_NO_MITSHM=1
+      - LIBGL_ALWAYS_SOFTWARE=1
+    command: ["bash"]
+
+  # Gazebo cross-check of the comparison.
+  # docker compose --profile sim run --rm gazebo-comparison
+  gazebo-comparison:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: ros2-campus-shuttle/sim:local
+    profiles: ["sim"]
+    working_dir: /ws
+    volumes:
+      - .:/ws
+    environment:
+      - ROS_DOMAIN_ID=42
+      - LIBGL_ALWAYS_SOFTWARE=1
+    command: ["bash", "scripts/run_comparison.sh", "campus_loop", "1.0"]

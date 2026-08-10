@@ -1,0 +1,38 @@
+# Toolchain for everything that does not need ROS 2:
+#   - the controller core, its unit tests and the offline comparison bench
+#   - the camera-to-LiDAR extrinsic calibration
+#   - the analysis and plotting scripts
+#
+# This image is small and quick to build, which is deliberate. The headline
+# result and every number in the README come out of this image, so reproducing
+# them does not require a ROS 2 or Gazebo installation. The full simulation
+# stack lives in docker/Dockerfile.
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MPLBACKEND=Agg
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential \
+      cmake \
+      ca-certificates \
+      python3 \
+      python3-numpy \
+      python3-scipy \
+      python3-matplotlib \
+      python3-pandas \
+      python3-yaml \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY . /workspace
+
+# Build once at image build time so `docker compose up` does not pay for it.
+RUN cmake -S src/shuttle_control/core -B /build \
+      -DCMAKE_BUILD_TYPE=Release -DSHUTTLE_CORE_BUILD_TESTS=ON \
+    && cmake --build /build -j"$(nproc)"
+
+ENV PATH="/build:${PATH}"
+
+CMD ["/bin/bash", "scripts/run_bench.sh"]

@@ -1,0 +1,17 @@
+<library path="shuttle_nav2_controllers">
+  <class name="shuttle_control/PurePursuitController"
+         type="shuttle_control::PurePursuitController"
+         base_class_type="nav2_core::Controller">
+    <description>
+      Geometric Pure Pursuit path tracker with a speed-scheduled lookahead.
+    </description>
+  </class>
+  <class name="shuttle_control/StanleyController"
+         type="shuttle_control::StanleyController"
+         base_class_type="nav2_core::Controller">
+    <description>
+      Stanley path tracker adapted to a differential drive through a virtual
+      front axle.
+    </description>
+  </class>
+</library>

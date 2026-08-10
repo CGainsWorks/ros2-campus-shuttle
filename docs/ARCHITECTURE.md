@@ -1,0 +1,120 @@
+# Architecture
+
+## Why the control code has no ROS dependency
+
+Everything under `src/shuttle_control/core/` compiles against the C++ standard
+library and nothing else. That one decision drives most of the repository's
+shape.
+
+It means the controller comparison can run headless, deterministically and in
+about twenty seconds in a small Debian image, with no ROS installation and no
+Gazebo. Anyone can reproduce the headline numbers. It also means the code under
+comparison is provably the same in three places:
+
+```
+                    shuttle_control_core
+                   (Path, SpeedLimiter,
+                PurePursuit, Stanley, metrics)
+                             |
+        +--------------------+--------------------+
+        |                    |                    |
+  path_tracker_node    Nav2 plugins        controller_bench
+  (ROS 2 node)      (nav2_core::Controller)  (offline, no ROS)
+```
+
+If the benchmark says Stanley overshoots on tight corners, that statement is
+about the same object file Nav2 loads.
+
+## Package layout
+
+| Package | Contents |
+| --- | --- |
+| `shuttle_msgs` | `TrackingError`, `ControllerMetrics` |
+| `shuttle_description` | URDF/xacro, Gazebo sensor plugins, RViz configs |
+| `shuttle_control` | The core library, the standalone tracker node, the Nav2 plugins, the metrics recorder, the benchmark |
+| `shuttle_localisation` | EKF ground-truth evaluator, fixed reference-path publisher |
+| `shuttle_perception` | Camera-to-LiDAR extrinsic calibration |
+| `shuttle_bringup` | Launch files, all YAML parameters, simulation assets |
+
+## Frames
+
+```
+map
+ └── odom                      (global EKF, or a static identity in comparison runs)
+      └── base_footprint       (local EKF: wheel odometry + IMU)
+           └── base_link
+                ├── left_wheel_link / right_wheel_link
+                ├── caster_link
+                ├── lidar_link
+                ├── imu_link
+                └── camera_link
+                     └── camera_optical_frame   (REP 103: z forward, x right, y down)
+```
+
+Exactly one node owns each transform. The Gazebo differential-drive plugin has
+`publish_odom_tf` disabled and AMCL has `tf_broadcast` disabled, because
+`robot_localization` owns `odom -> base_footprint` and `map -> odom`
+respectively. Two publishers for one edge is the most common way a ROS TF tree
+goes subtly wrong: it does not error, the transform just flickers between two
+answers.
+
+## Localisation
+
+Two `robot_localization` EKF instances, which is the pattern the package is
+designed for:
+
+- **local** (`ekf.yaml`), `world_frame: odom` — fuses wheel odometry velocities
+  and IMU yaw rate. Smooth and continuous, drifts without bound. This is what
+  the controller runs on.
+- **global** (`ekf_global.yaml`), `world_frame: map` — adds the AMCL pose.
+  Absorbs discrete localisation corrections so they never make `odom` jump.
+
+Wheel odometry contributes **velocities, not absolute pose**. Feeding integrated
+dead-reckoned position into the filter would shrink the covariance around an
+estimate that is drifting, which is worse than not fusing it at all.
+
+The "LiDAR" in "EKF fusing LiDAR, IMU and wheel odometry" enters as the AMCL
+pose — a scan match against the map — rather than as raw scans.
+
+## How the comparison run works
+
+`scripts/run_comparison.sh` launches Gazebo once per controller. Each run:
+
+1. `path_publisher` emits the scenario path, **latched**, on `/plan`. The path
+   is generated from fixed geometry rather than planned by Nav2, because a
+   replanned route can differ between runs and any difference in the reference
+   confounds the difference between the controllers.
+2. `path_tracker_node` follows it and publishes `/tracking_error`.
+3. `metrics_recorder_node` scores the run against `/ground_truth/odom` — the
+   Gazebo p3d plugin's exact model pose — and writes CSV in the same format the
+   offline benchmark emits.
+4. `analysis/compare_controllers.py` reads either source.
+
+The recorder is C++ linking the core library rather than a Python node with its
+own geometry, so Gazebo runs and offline runs are scored by literally the same
+`Path::project()` and `summarise()`.
+
+## Where the duplication is, and how it is controlled
+
+The scenario geometry exists twice: in C++ (`scenarios.cpp`, for the benchmark,
+which must build without ROS) and in Python (`scenario_paths.py`, for the Gazebo
+path publisher, which must run without a compiler).
+
+Duplicated geometry drifts silently, and a comparison run against a subtly
+different reference path is worthless. `tests/test_scenarios_match.py` dumps the
+C++ paths and checks the Python ones match point for point; they currently agree
+to under a micrometre.
+
+## Testing
+
+| Test | What it protects |
+| --- | --- |
+| `test_core` (C++, 142 checks) | Path geometry, projection signs, speed limiter, plant integration, steering-sign conventions, determinism, **path continuity** |
+| `tests/test_scenarios_match.py` | The two scenario implementations agree |
+| `tests/test_calibration.py` | Calibration accuracy, residual sits at the noise floor, degeneracy is detected |
+
+The path-continuity check exists because an early version of the staircase
+scenario emitted a path that jumped backwards by 1.15 m at one corner. Both
+controllers stalled there, and it looked exactly like a controller defect. A
+comparison is only worth reporting if the reference trajectories are sound, so
+they are checked rather than assumed.

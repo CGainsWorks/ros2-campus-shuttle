@@ -1,0 +1,39 @@
+# ROS 2 / colcon
+build/
+install/
+log/
+
+# Generated results. Everything here is reproducible from scripts/run_bench.sh
+# and scripts/run_comparison.sh, so none of it belongs in git. The committed
+# outputs are docs/RESULTS.md, analysis/figures/ and calibration/extrinsics.yaml.
+results/
+
+# Calibration input observations: regenerated deterministically from a seed by
+# synth_calib_data.py. The solved extrinsics.yaml IS committed.
+calibration/observations.json
+
+# Rosbags: pointers live in data/, the bags themselves do not.
+*.db3
+*.mcap
+data/bags/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# C++
+*.o
+*.a
+*.so
+compile_commands.json
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,37 @@
+# Parameters for the standalone path_tracker_node.
+#
+# Both controllers are configured here; controller_type selects which one runs.
+# The gains match src/shuttle_bringup/config/tuned_gains.yaml, which
+# `controller_bench --tune` regenerates. Keep them in step by re-running
+# scripts/run_bench.sh rather than editing either file by hand.
+path_tracker:
+  ros__parameters:
+    use_sim_time: true
+
+    controller_type: pure_pursuit
+    global_frame: map
+    base_frame: base_footprint
+    control_rate: 20.0
+
+    # Shared longitudinal limits. Identical for both controllers by design: if
+    # they disagreed about speed, a difference in tracking error could just be
+    # one of them taking the corner slower.
+    max_speed: 1.0
+    max_lon_accel: 0.8
+    max_lat_accel: 0.8
+    min_moving_speed: 0.15
+    goal_tolerance: 0.25
+    max_omega: 1.5
+    search_window: 120
+
+    pure_pursuit:
+      lookahead_gain: 0.65
+      lookahead_base: 0.0
+      lookahead_min: 0.15
+      lookahead_max: 3.0
+
+    stanley:
+      k_e: 1.5
+      k_soft: 0.05
+      front_axle_distance: 0.3
+      max_steer: 1.0

@@ -1,0 +1,87 @@
+# robot_localization EKF, global instance: map -> odom.
+#
+# Same sensors as the local filter, plus the absolute pose from AMCL. Running
+# two instances is the pattern robot_localization is designed for: the local
+# filter stays smooth and continuous for the controller, the global one absorbs
+# the discrete corrections from LiDAR localisation without making odom jump.
+#
+# This filter is what "EKF fusing LiDAR, IMU and wheel odometry" refers to: the
+# LiDAR contribution arrives as the AMCL pose, which is a scan match against the
+# map rather than raw scans.
+ekf_filter_node_map:
+  ros__parameters:
+    frequency: 50.0
+    sensor_timeout: 0.2
+    two_d_mode: true
+    publish_tf: true
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: map
+
+    odom0: /wheel/odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_nodelay: true
+
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  true,  false, false]
+    imu0_queue_size: 20
+    imu0_nodelay: true
+    imu0_remove_gravitational_acceleration: true
+
+    # AMCL pose: absolute x, y and yaw in the map frame.
+    pose0: /amcl_pose
+    pose0_config: [true,  true,  false,
+                   false, false, true,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false]
+    pose0_queue_size: 10
+    pose0_differential: false
+    pose0_relative: false
+    pose0_nodelay: true
+
+    # Every entry below carries a decimal point on purpose; see the note in
+    # ekf.yaml. A bare 0 among floats makes the whole file fail to parse.
+    process_noise_covariance: [0.03, 0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.03, 0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.02, 0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.3, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.3, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.03, 0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.015, 0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.015, 0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.02, 0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.1, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.1, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.015, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.02, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.02, 0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.02]
+
+    initial_estimate_covariance: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]

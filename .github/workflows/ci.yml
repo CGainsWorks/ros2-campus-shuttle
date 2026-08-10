@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Everything that does not need ROS. This is the job that guards the headline
+  # result, and it runs in about a minute.
+  core:
+    name: Controller core, geometry and calibration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake python3-numpy python3-scipy \
+            python3-matplotlib python3-pandas python3-yaml
+
+      - name: ROS 2 parameter files load
+        run: python3 tests/test_param_files.py
+
+      - name: Build
+        run: |
+          cmake -S src/shuttle_control/core -B build/core \
+            -DCMAKE_BUILD_TYPE=Release -DSHUTTLE_CORE_BUILD_TESTS=ON
+          cmake --build build/core -j"$(nproc)"
+
+      - name: Controller core tests
+        run: ./build/core/test_core
+
+      - name: Scenario geometry matches between C++ and Python
+        run: |
+          mkdir -p /tmp/paths
+          ./build/core/controller_bench --dump-paths /tmp/paths
+          python3 tests/test_scenarios_match.py --paths /tmp/paths
+
+      - name: Calibration tests
+        run: |
+          PYTHONPATH="$PWD/src/shuttle_perception" \
+            python3 tests/test_calibration.py
+
+      - name: Comparison runs end to end
+        run: |
+          mkdir -p results/bench/timeseries
+          ./build/core/controller_bench --out results/bench --tune
+          python3 analysis/compare_controllers.py \
+            --metrics results/bench/metrics.csv \
+            --timeseries results/bench/timeseries \
+            --figures /tmp/figures \
+            --results /tmp/RESULTS.md
+
+      - name: Every benchmark run must finish cleanly
+        run: |
+          python3 - <<'PY'
+          import csv, sys
+          bad = []
+          with open("results/bench/metrics.csv") as fh:
+              for row in csv.DictReader(fh):
+                  if (row["goal_reached"] != "1" or row["diverged"] == "1"
+                          or row["stalled"] == "1"):
+                      bad.append(f"{row['controller']} {row['scenario']} "
+                                 f"@ {row['target_speed']} noise={row['noise']}")
+          if bad:
+              print("runs that did not finish cleanly:")
+              for b in bad:
+                  print("  " + b)
+              sys.exit(1)
+          print("all runs finished cleanly")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: comparison-results
+          path: |
+            results/bench/metrics.csv
+            /tmp/figures
+            /tmp/RESULTS.md
+
+  # The ROS 2 workspace. Build and lint only; the Gazebo comparison is too heavy
+  # for CI and is run locally via scripts/run_comparison.sh.
+  ros:
+    name: colcon build (Humble)
+    runs-on: ubuntu-latest
+    container:
+      image: osrf/ros:humble-desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          rosdep update --rosdistro humble
+          rosdep install --from-paths src --ignore-src -y \
+            --rosdistro humble || true
+
+      - name: Build
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+      - name: Test
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon test --return-code-on-test-failure
+          colcon test-result --verbose
+
+  lint:
+    name: Python lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install flake8
+      - run: flake8 --max-line-length 100 analysis src tests

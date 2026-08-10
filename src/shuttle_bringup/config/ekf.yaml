@@ -1,0 +1,87 @@
+# robot_localization EKF, local instance: odom -> base_footprint.
+#
+# Fuses wheel odometry with the IMU. This estimate is continuous and smooth but
+# drifts without bound, which is exactly what the odom frame is supposed to be.
+# The global instance in ekf_global.yaml adds the map frame.
+#
+# Configuration matrices are 15 element booleans in the order
+#   x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az
+ekf_filter_node_odom:
+  ros__parameters:
+    frequency: 50.0
+    sensor_timeout: 0.2
+    two_d_mode: true
+    publish_tf: true
+    publish_acceleration: false
+
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+
+    # Wheel odometry: trust the body-frame velocities, not the integrated pose.
+    # Feeding absolute x/y from dead reckoning into the filter would make the
+    # covariance shrink around an estimate that is drifting.
+    odom0: /wheel/odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+    odom0_nodelay: true
+
+    # IMU: yaw rate and forward acceleration. Absolute yaw is deliberately not
+    # fused here, because in the odom frame there is no absolute reference and
+    # the simulated IMU has no magnetometer.
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  true,  false, false]
+    imu0_queue_size: 20
+    imu0_differential: false
+    imu0_relative: false
+    imu0_nodelay: true
+    imu0_remove_gravitational_acceleration: true
+
+    # Every entry below carries a decimal point on purpose. The ROS 2 YAML
+    # parser requires a sequence to be homogeneous, so a single bare 0 among
+    # floats makes the whole parameter file fail to load and ekf_node aborts at
+    # startup with "Sequence should be of same type". The failure is not local
+    # to this parameter: nothing in the file loads, the node dies, and the only
+    # visible symptom is a TF tree missing odom -> base_footprint.
+    process_noise_covariance: [0.02, 0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.02, 0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.02, 0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.3, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.3, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.02, 0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.015, 0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.015, 0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.02, 0.0, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.1, 0.0, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.1, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.015, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.02, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.02, 0.0,
+                               0.0,  0.0,  0.0,  0.0, 0.0, 0.0,  0.0,   0.0,   0.0,  0.0, 0.0, 0.0,   0.0,  0.0,  0.02]
+
+    initial_estimate_covariance: [1e-9, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  1e-9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0,
+                                  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
