@@ -6,7 +6,7 @@ you can drive with teleop.
 
 from launch import LaunchDescription
 from launch.actions import (
-    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
+    DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -61,14 +61,29 @@ def generate_launch_description():
             launch_arguments={"use_sim_time": "true", "rviz": use_rviz}.items(),
         ),
 
-        Node(
-            package="gazebo_ros",
-            executable="spawn_entity.py",
-            output="screen",
-            arguments=[
-                "-topic", "robot_description",
-                "-entity", "shuttle",
-                "-x", x_pose, "-y", y_pose, "-z", "0.05", "-Y", yaw_pose,
+        # Spawning is delayed and given a generous service timeout.
+        #
+        # gzserver's default 30 s is not enough on a cold start in a container:
+        # loading the world, failing over the render engine and timing out on
+        # the audio device can take longer than that. spawn_entity then gives up,
+        # the robot never appears, and everything downstream still starts
+        # happily -- the controller runs against an empty world and the metrics
+        # recorder collects nothing. That failure is silent, which is the worst
+        # kind in a comparison: it drops one controller from the results.
+        TimerAction(
+            period=8.0,
+            actions=[
+                Node(
+                    package="gazebo_ros",
+                    executable="spawn_entity.py",
+                    output="screen",
+                    arguments=[
+                        "-topic", "robot_description",
+                        "-entity", "shuttle",
+                        "-timeout", "180.0",
+                        "-x", x_pose, "-y", y_pose, "-z", "0.05", "-Y", yaw_pose,
+                    ],
+                ),
             ],
         ),
 

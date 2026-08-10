@@ -62,16 +62,25 @@ public:
 
   /// Write the results. Called from main() on shutdown so the files land even
   /// when the run is stopped with Ctrl-C.
-  void finish()
+  /// @return true if metrics were written.
+  bool finish()
   {
     if (wrote_) {
-      return;
+      return true;
     }
     wrote_ = true;
 
     if (samples_.empty()) {
-      RCLCPP_WARN(get_logger(), "no samples recorded, nothing written");
-      return;
+      // Loud, and fatal to the run. An empty result here means the robot was
+      // never spawned or ground truth never arrived, and the comparison would
+      // otherwise carry on and report the other controller as if the pair had
+      // been measured.
+      RCLCPP_ERROR(
+        get_logger(),
+        "no samples recorded for %s on %s: no ground truth was received. "
+        "Check that the robot spawned and that /ground_truth/odom is publishing.",
+        controller_.c_str(), scenario_.c_str());
+      return false;
     }
 
     const RunMetrics m = summarise(
@@ -140,6 +149,7 @@ public:
       "%s: RMS cross-track %.4f m, max %.4f m, RMS heading %.4f rad, progress %.1f%%",
       controller_.c_str(), m.cross_track.rms, m.cross_track.max_abs,
       m.heading.rms, 100.0 * m.progress);
+    return true;
   }
 
   bool done() const
@@ -253,8 +263,10 @@ int main(int argc, char ** argv)
     rclcpp::spin_some(node);
     rate.sleep();
   }
-  node->finish();
+  const bool wrote = node->finish();
 
   rclcpp::shutdown();
-  return 0;
+  // Exit non-zero when nothing was recorded, so the calling script can refuse
+  // to build a comparison out of a half-populated result set.
+  return wrote ? 0 : 1;
 }

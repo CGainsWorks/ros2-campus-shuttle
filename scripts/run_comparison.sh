@@ -83,6 +83,19 @@ for CONTROLLER in pure_pursuit stanley; do
   pkill -f gzserver >/dev/null 2>&1 || true
   pkill -f gzclient >/dev/null 2>&1 || true
   sleep 3
+
+  # Every controller must have contributed a row. If the robot failed to spawn,
+  # or ground truth never arrived, the recorder writes nothing -- and without
+  # this check the script would go on to "compare" a single controller against
+  # itself and present the output as a result.
+  if ! grep -q "^${CONTROLLER}," "$OUT_DIR/metrics.csv" 2>/dev/null; then
+    echo >&2
+    echo "error: $CONTROLLER recorded no metrics for $SCENARIO." >&2
+    echo "       The comparison is incomplete and no results will be written." >&2
+    echo "       Usual cause: the robot did not spawn, so /ground_truth/odom" >&2
+    echo "       never published. Check the spawn_entity output above." >&2
+    exit 1
+  fi
 done
 
 echo
