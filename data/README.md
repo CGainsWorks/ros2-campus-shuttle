@@ -15,8 +15,8 @@ ros2 run nav2_map_server map_saver_cli -f data/maps/campus_map
 A `.pgm` plus `.yaml` pair lands here and `nav2.launch.py` picks it up.
 
 Maps are not committed. They are a few hundred kilobytes of binary that changes
-on every remap, and they are reproducible from the world file in two minutes.
-The world (`simulation/worlds/campus.world`) is the source of truth.
+on every remap and they are reproducible from the world file in two minutes.
+The world (`simulation/worlds/campus.sdf`) is the source of truth.
 
 ## Rosbags
 
@@ -28,7 +28,7 @@ Record one during a comparison run with:
 ```bash
 ros2 bag record -o data/bags/run_$(date +%s) \
     /scan /imu/data /wheel/odom /odometry/filtered \
-    /ground_truth/odom /plan /cmd_vel /tracking_error
+    /ground_truth/odom /plan /cmd_vel_in /cmd_vel /tracking_error
 ```
 
 `data/bags/` is gitignored.

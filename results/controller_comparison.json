@@ -1,0 +1,332 @@
+{
+  "about": "Every number the README quotes about the controller comparison, the Gazebo cross-check and the safety layer. All of it is simulated. Written by analysis/summarise_results.py; checked against the README by scripts/check_readme.py.",
+  "bench": {
+    "source": "results/bench/metrics.csv (scripts/run_bench.sh)",
+    "label": "simulated: kinematic benchmark, deterministic",
+    "runs": 84,
+    "failed_runs": 0,
+    "scenarios": 7,
+    "speeds_mps": [
+      0.5,
+      1.0,
+      1.5
+    ],
+    "reference_speed_mps": 1.0,
+    "rms_by_scenario": {
+      "straight_offset": {
+        "pure_pursuit": {
+          "rms_m": 0.2101,
+          "max_m": 1.0
+        },
+        "stanley": {
+          "rms_m": 0.2028,
+          "max_m": 1.0
+        },
+        "closer": "stanley"
+      },
+      "heading_offset": {
+        "pure_pursuit": {
+          "rms_m": 0.0126,
+          "max_m": 0.0831
+        },
+        "stanley": {
+          "rms_m": 0.0033,
+          "max_m": 0.0243
+        },
+        "closer": "stanley"
+      },
+      "circle": {
+        "pure_pursuit": {
+          "rms_m": 0.0001,
+          "max_m": 0.0007
+        },
+        "stanley": {
+          "rms_m": 0.0073,
+          "max_m": 0.0075
+        },
+        "closer": "pure_pursuit"
+      },
+      "corner": {
+        "pure_pursuit": {
+          "rms_m": 0.0037,
+          "max_m": 0.0108
+        },
+        "stanley": {
+          "rms_m": 0.0124,
+          "max_m": 0.0372
+        },
+        "closer": "pure_pursuit"
+      },
+      "figure_eight": {
+        "pure_pursuit": {
+          "rms_m": 0.0009,
+          "max_m": 0.0025
+        },
+        "stanley": {
+          "rms_m": 0.0114,
+          "max_m": 0.0251
+        },
+        "closer": "pure_pursuit"
+      },
+      "campus_loop": {
+        "pure_pursuit": {
+          "rms_m": 0.0011,
+          "max_m": 0.0055
+        },
+        "stanley": {
+          "rms_m": 0.0054,
+          "max_m": 0.019
+        },
+        "closer": "pure_pursuit"
+      },
+      "sharp_turns": {
+        "pure_pursuit": {
+          "rms_m": 0.0059,
+          "max_m": 0.0142
+        },
+        "stanley": {
+          "rms_m": 0.0192,
+          "max_m": 0.046
+        },
+        "closer": "pure_pursuit"
+      }
+    },
+    "curved_route_rms_ratio_stanley_over_pp": {
+      "min": 3.2,
+      "min_scenario": "sharp_turns"
+    },
+    "noise": {
+      "pure_pursuit": {
+        "clean_rms_m": 0.0334,
+        "noisy_rms_m": 0.0415,
+        "penalty_pct": 24.1
+      },
+      "stanley": {
+        "clean_rms_m": 0.0378,
+        "noisy_rms_m": 0.047,
+        "penalty_pct": 24.5
+      }
+    },
+    "step_response": {
+      "straight_offset@0.5": {
+        "pure_pursuit": {
+          "settle_m": 0.95,
+          "overshoot_cm": 1.1
+        },
+        "stanley": {
+          "settle_m": 1.46,
+          "overshoot_cm": 0.0
+        }
+      },
+      "straight_offset@1": {
+        "pure_pursuit": {
+          "settle_m": 1.06,
+          "overshoot_cm": 2.3
+        },
+        "stanley": {
+          "settle_m": 2.3,
+          "overshoot_cm": 0.0
+        }
+      },
+      "straight_offset@1.5": {
+        "pure_pursuit": {
+          "settle_m": 1.07,
+          "overshoot_cm": 3.6
+        },
+        "stanley": {
+          "settle_m": 3.45,
+          "overshoot_cm": 0.9
+        }
+      },
+      "heading_offset@0.5": {
+        "pure_pursuit": {
+          "settle_m": 0.58,
+          "overshoot_cm": 6.1
+        },
+        "stanley": {
+          "settle_m": 0.0,
+          "overshoot_cm": 0.6
+        }
+      },
+      "heading_offset@1": {
+        "pure_pursuit": {
+          "settle_m": 0.76,
+          "overshoot_cm": 8.3
+        },
+        "stanley": {
+          "settle_m": 0.0,
+          "overshoot_cm": 1.0
+        }
+      },
+      "heading_offset@1.5": {
+        "pure_pursuit": {
+          "settle_m": 0.76,
+          "overshoot_cm": 8.3
+        },
+        "stanley": {
+          "settle_m": 0.0,
+          "overshoot_cm": 1.0
+        }
+      }
+    }
+  },
+  "gazebo": {
+    "source": "scripts/run_gazebo_repeats.sh",
+    "label": "simulated: Gazebo physics, not bit-reproducible",
+    "simulator": "Gazebo Harmonic (gz-sim 8.15.0) with ROS 2 Jazzy",
+    "date": "2026-10-16",
+    "scenario": "corner",
+    "speed_mps": 1.0,
+    "repeats": [
+      {
+        "pure_pursuit": {
+          "rms_m": 0.0615,
+          "max_m": 0.1756,
+          "goal_reached": true,
+          "progress": 0.985,
+          "control_effort": 0.26
+        },
+        "stanley": {
+          "rms_m": 0.061,
+          "max_m": 0.1485,
+          "goal_reached": true,
+          "progress": 0.986,
+          "control_effort": 0.46
+        },
+        "ekf": [
+          {
+            "controller": "pure_pursuit",
+            "position_rms_m": 0.173,
+            "position_max_m": 0.25,
+            "heading_rms_rad": 0.0125,
+            "along_track_rms_m": 0.163,
+            "cross_track_rms_m": 0.058
+          },
+          {
+            "controller": "stanley",
+            "position_rms_m": 0.159,
+            "position_max_m": 0.25,
+            "heading_rms_rad": 0.0115,
+            "along_track_rms_m": 0.147,
+            "cross_track_rms_m": 0.062
+          }
+        ]
+      },
+      {
+        "pure_pursuit": {
+          "rms_m": 0.0649,
+          "max_m": 0.1805,
+          "goal_reached": true,
+          "progress": 0.985,
+          "control_effort": 0.27
+        },
+        "stanley": {
+          "rms_m": 0.0618,
+          "max_m": 0.1371,
+          "goal_reached": true,
+          "progress": 0.977,
+          "control_effort": 0.42
+        },
+        "ekf": [
+          {
+            "controller": "pure_pursuit",
+            "position_rms_m": 0.172,
+            "position_max_m": 0.256,
+            "heading_rms_rad": 0.0125,
+            "along_track_rms_m": 0.16,
+            "cross_track_rms_m": 0.061
+          },
+          {
+            "controller": "stanley",
+            "position_rms_m": 0.275,
+            "position_max_m": 0.383,
+            "heading_rms_rad": 0.0253,
+            "along_track_rms_m": 0.267,
+            "cross_track_rms_m": 0.068
+          }
+        ]
+      },
+      {
+        "pure_pursuit": {
+          "rms_m": 0.0553,
+          "max_m": 0.1744,
+          "goal_reached": true,
+          "progress": 0.983,
+          "control_effort": 0.28
+        },
+        "stanley": {
+          "rms_m": 0.0548,
+          "max_m": 0.1438,
+          "goal_reached": true,
+          "progress": 0.982,
+          "control_effort": 0.47
+        },
+        "ekf": [
+          {
+            "controller": "pure_pursuit",
+            "position_rms_m": 0.2,
+            "position_max_m": 0.256,
+            "heading_rms_rad": 0.0169,
+            "along_track_rms_m": 0.193,
+            "cross_track_rms_m": 0.054
+          },
+          {
+            "controller": "stanley",
+            "position_rms_m": 0.208,
+            "position_max_m": 0.276,
+            "heading_rms_rad": 0.018,
+            "along_track_rms_m": 0.2,
+            "cross_track_rms_m": 0.058
+          }
+        ]
+      }
+    ],
+    "rms_span_m": {
+      "pure_pursuit": [
+        0.0553,
+        0.0649
+      ],
+      "stanley": [
+        0.0548,
+        0.0618
+      ]
+    },
+    "ekf_span": {
+      "position_rms_m": [
+        0.159,
+        0.275
+      ],
+      "position_max_m": [
+        0.25,
+        0.383
+      ],
+      "heading_rms_rad": [
+        0.0115,
+        0.0253
+      ],
+      "along_track_rms_m": [
+        0.147,
+        0.267
+      ],
+      "cross_track_rms_m": [
+        0.054,
+        0.068
+      ]
+    }
+  },
+  "safety": {
+    "source": "src/shuttle_bringup/test/test_safety_sim.py",
+    "label": "simulated: Gazebo, ground-truth speed, simulated time",
+    "command_timeout": {
+      "bound_s": 1.0,
+      "cmd_timeout_s": 0.5,
+      "initial_speed_mps": 1.0,
+      "time_to_rest_s": 0.764
+    },
+    "estop": {
+      "bound_s": 0.5,
+      "initial_speed_mps": 1.0,
+      "time_to_rest_s": 0.26
+    }
+  }
+}

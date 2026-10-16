@@ -9,7 +9,7 @@
 #   5. controller tuning, the full comparison matrix, figures and RESULTS.md
 #   6. a check that every expected artifact exists and is not empty
 #
-# The final check matters. Each step above prints its own success, but a script
+# The final check matters. Each step above prints its own success but a script
 # that runs to completion is not the same as a script that produced the results
 # it claims to: a plotting call that silently wrote nothing, or a stale file
 # left from a previous run, both look like success from the console output.

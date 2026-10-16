@@ -3,10 +3,13 @@ build/
 install/
 log/
 
-# Generated results. Everything here is reproducible from scripts/run_bench.sh
-# and scripts/run_comparison.sh, so none of it belongs in git. The committed
-# outputs are docs/RESULTS.md, analysis/figures/ and calibration/extrinsics.yaml.
-results/
+# Generated results. The raw output is reproducible from scripts/run_bench.sh,
+# scripts/run_gazebo_repeats.sh and the launch tests, so it stays out of git.
+# The exception is the compact summary of every number the README quotes,
+# which CI checks the README against. Other committed outputs are
+# docs/RESULTS*.md, analysis/figures/ and calibration/extrinsics.yaml.
+results/*
+!results/controller_comparison.json
 
 # Calibration input observations: regenerated deterministically from a seed by
 # synth_calib_data.py. The solved extrinsics.yaml IS committed.

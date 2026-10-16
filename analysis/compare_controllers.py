@@ -411,7 +411,7 @@ def build_verdict(df, speed) -> tuple[str, dict]:
         detail = "; ".join(parts) if parts else "no paired runs were recorded"
         verdict = (
             f"Too few scenarios here to draw a conclusion: {detail}. "
-            "This is a single-route check, not the controller comparison — "
+            "This is a single-route check, not the controller comparison; "
             "see docs/RESULTS.md for that, which covers seven scenarios at "
             "three speeds with and without odometry noise."
         )
@@ -437,7 +437,7 @@ def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir,
                     (df.goal_reached == 0)).sum())
 
     gazebo = "gazebo" in metrics_path
-    regenerator = ("scripts/run_comparison.sh" if gazebo
+    regenerator = ("scripts/run_gazebo_repeats.sh" if gazebo
                    else "scripts/run_bench.sh")
 
     with open(path, "w", encoding="utf-8") as f:
@@ -550,6 +550,20 @@ def write_results(path, df, verdict, stats, figures, speed, gains_text, ts_dir,
                 f.write(f"### {title}\n\n![{title}]({rel})\n\n")
 
         f.write("## Reading these numbers honestly\n\n")
+        if gazebo:
+            f.write(
+                "- These are runs in Gazebo (gz-sim) against its physics "
+                "engine, scored against the simulator's ground-truth pose. "
+                "Wheel odometry is integrated from the wheel joints, so the "
+                "controller drives on a dead-reckoned estimate that drifts.\n"
+                "- Where a route was repeated, each table row is the mean over "
+                "the repeats and the figures show the last repeat. Every "
+                "repeat is listed in `results/controller_comparison.json`.\n"
+                "- A difference between the two controllers smaller than the "
+                "spread between repeats of the same controller is not a "
+                "result.\n"
+            )
+            return
         f.write(
             "- `straight_offset` starts 1.0 m off the path, so its RMS is "
             "dominated by the recovery transient and is not comparable with "
