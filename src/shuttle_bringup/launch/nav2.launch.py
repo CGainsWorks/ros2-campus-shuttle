@@ -114,8 +114,11 @@ def generate_launch_description():
             name="velocity_smoother",
             output="screen",
             parameters=[nav2_params],
+            # The smoothed command goes to the safety gate, which owns
+            # /cmd_vel: Nav2 is one command source among several and an
+            # e-stop or a dead controller has to stop it like any other.
             remappings=[("cmd_vel", "cmd_vel_nav"),
-                        ("cmd_vel_smoothed", "cmd_vel")],
+                        ("cmd_vel_smoothed", "cmd_vel_in")],
         ),
         Node(
             package="nav2_lifecycle_manager",

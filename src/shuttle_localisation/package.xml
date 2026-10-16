@@ -5,13 +5,14 @@
   <version>0.1.0</version>
   <description>
     EKF support nodes for the campus shuttle: ground-truth evaluation of the
-    filter, and the fixed reference-path publisher used by the controller
+    filter and the fixed reference-path publisher used by the controller
     comparison.
   </description>
   <maintainer email="114424105+CGainsWorks@users.noreply.github.com">CGainsWorks</maintainer>
   <license>MIT</license>
 
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>robot_localization</exec_depend>

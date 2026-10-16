@@ -16,6 +16,7 @@ from launch.actions import (
     DeclareLaunchArgument, EmitEvent, IncludeLaunchDescription,
     RegisterEventHandler,
 )
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -34,6 +35,7 @@ def generate_launch_description():
     x_pose = LaunchConfiguration("x")
     y_pose = LaunchConfiguration("y")
     yaw_pose = LaunchConfiguration("yaw")
+    exit_on_finish = LaunchConfiguration("exit_on_finish")
 
     # The recorder decides when the run is over: it exits once the controller
     # has reported the goal and the robot has settled.
@@ -62,6 +64,9 @@ def generate_launch_description():
         DeclareLaunchArgument("x", default_value="3.0"),
         DeclareLaunchArgument("y", default_value="0.0"),
         DeclareLaunchArgument("yaw", default_value="0.0"),
+        # The integration test keeps the launch up after the recorder exits and
+        # ends it itself, once it has checked the outputs.
+        DeclareLaunchArgument("exit_on_finish", default_value="true"),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -75,7 +80,7 @@ def generate_launch_description():
                 # wall and the run records a stall that says nothing about the
                 # control law. Obstacle avoidance is the Nav2 demo's job.
                 "world": PathJoinSubstitution(
-                    [bringup, "worlds", "empty_test.world"]),
+                    [bringup, "worlds", "empty_test.sdf"]),
                 "x": x_pose,
                 "y": y_pose,
                 "yaw": yaw_pose,
@@ -83,15 +88,23 @@ def generate_launch_description():
         ),
 
         # Ground truth from Gazebo is published in the world frame. For the
-        # comparison the map frame is the world frame, so publish the identity
-        # rather than running AMCL: localisation error would otherwise be mixed
-        # into the controller comparison, and the question here is which
+        # comparison the map frame IS the world frame, so map -> odom is the
+        # spawn pose (the odom frame starts wherever the robot starts) rather
+        # than the output of AMCL: localisation error would otherwise be mixed
+        # into the controller comparison and the question here is which
         # controller tracks better, not which localiser drifts less.
+        #
+        # This used to be the identity, which was only right for scenarios
+        # starting at the origin. From any other start pose the controller saw
+        # itself at the origin while the robot was elsewhere.
         Node(
             package="tf2_ros",
             executable="static_transform_publisher",
-            name="map_to_odom_identity",
-            arguments=["0", "0", "0", "0", "0", "0", "map", "odom"],
+            name="map_to_odom_spawn_pose",
+            arguments=[
+                "--x", x_pose, "--y", y_pose, "--yaw", yaw_pose,
+                "--frame-id", "map", "--child-frame-id", "odom",
+            ],
             parameters=[{"use_sim_time": True}],
         ),
 
@@ -122,7 +135,9 @@ def generate_launch_description():
                     "use_sim_time": True,
                 },
             ],
-            remappings=[("odom", "/odometry/filtered")],
+            # Commands go through the safety gate like every other source.
+            remappings=[("odom", "/odometry/filtered"),
+                        ("cmd_vel", "cmd_vel_in")],
         ),
 
         metrics_recorder,
@@ -133,7 +148,13 @@ def generate_launch_description():
             name="ekf_evaluator",
             output="screen",
             parameters=[{
-                "output_csv": "results/gazebo/ekf_evaluation.csv",
+                "output_csv": PathJoinSubstitution(
+                    [output_dir, "ekf_evaluation.csv"]),
+                # The estimate lives in the odom frame, which starts at the
+                # spawn pose; ground truth is in the world frame.
+                "odom_origin_x": x_pose,
+                "odom_origin_y": y_pose,
+                "odom_origin_yaw": yaw_pose,
                 "use_sim_time": True,
             }],
         ),
@@ -143,12 +164,13 @@ def generate_launch_description():
         # Without this, nothing tells the launch the experiment is finished: the
         # other nodes keep running and the wrapper script's timeout eventually
         # kills everything. That wastes the whole remaining timeout on every
-        # run, and the shutdown then arrives as a hard signal partway through
+        # run and the shutdown then arrives as a hard signal partway through
         # the EKF evaluator's write, which is how its results were being lost.
         RegisterEventHandler(
             OnProcessExit(
                 target_action=metrics_recorder,
                 on_exit=[EmitEvent(event=Shutdown(reason="run complete"))],
-            )
+            ),
+            condition=IfCondition(exit_on_finish),
         ),
     ])

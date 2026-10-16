@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# Run the Gazebo server and make sure it stops when this script is told to.
+#
+# `gz sim -s` is a Ruby front end that forks the actual server. When a launch
+# shuts down it signals only the process it started (the front end) and if the
+# server is slow to react the front end is killed and the server is left
+# running as an orphan. The next simulation in the same transport partition
+# then finds two worlds publishing /clock and two robots publishing ground
+# truth, which is how one integration run once recorded a robot 17 m from
+# where it was.
+#
+# So the server runs in its own process group and a stop signal goes to the
+# whole group: SIGINT first for a clean exit, then SIGKILL if it has not gone
+# within four seconds (inside launch's own five-second escalation).
+#
+#   gz_server [gz sim arguments...]
+set -m
+
+gz sim "$@" &
+pgid=$!
+
+stop() {
+  kill -INT -- "-$pgid" 2>/dev/null
+  for _ in $(seq 40); do
+    kill -0 -- "-$pgid" 2>/dev/null || exit 0
+    sleep 0.1
+  done
+  kill -KILL -- "-$pgid" 2>/dev/null
+  exit 0
+}
+trap stop INT TERM
+
+wait "$pgid"
+status=$?
+# The server exited by itself; take any stragglers in its group with it.
+kill -KILL -- "-$pgid" 2>/dev/null
+exit "$status"

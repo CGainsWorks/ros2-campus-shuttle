@@ -2,10 +2,11 @@
 #
 # Gazebo cross-check of the controller comparison.
 #
-# Runs each controller over the same scenario in the physics simulator, scoring
-# against the Gazebo ground-truth pose. This is the high-fidelity counterpart to
-# scripts/run_bench.sh: slower, heavier, and it exercises wheel slip and contact
-# dynamics the kinematic benchmark does not model.
+# Runs each controller over the same scenario in the physics simulator (modern
+# Gazebo, gz-sim Harmonic), scoring against the Gazebo ground-truth pose. This is
+# the high-fidelity counterpart to scripts/run_bench.sh: slower, heavier and it
+# exercises wheel slip and contact dynamics the kinematic benchmark does not
+# model.
 #
 # The two controllers get the same world, the same latched plan and the same
 # start pose. Only the lateral control law differs.
@@ -13,22 +14,29 @@
 # Usage:
 #   scripts/run_comparison.sh [scenario] [speed]
 #
+# Environment:
+#   OUT_DIR        where metrics.csv and timeseries/ go (default results/gazebo)
+#   TIMEOUT        per-run backstop in seconds (default 400)
+#   SKIP_ANALYSIS  set to 1 to skip regenerating docs/RESULTS_GAZEBO.md, as
+#                  scripts/run_gazebo_repeats.sh does between repeats
+#
 # Must run inside the simulation image (docker/Dockerfile), which has ROS 2 and
 # Gazebo. From the host:
-#   docker compose run --rm sim scripts/run_comparison.sh campus_loop 1.0
+#   docker compose --profile sim run --rm sim scripts/run_comparison.sh campus_loop 1.0
 set -euo pipefail
 
 SCENARIO="${1:-campus_loop}"
 SPEED="${2:-1.0}"
 OUT_DIR="${OUT_DIR:-results/gazebo}"
 TIMEOUT="${TIMEOUT:-400}"
+SKIP_ANALYSIS="${SKIP_ANALYSIS:-0}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 if ! command -v ros2 >/dev/null 2>&1; then
   echo "error: ros2 not found. Run this inside the simulation image:" >&2
-  echo "  docker compose run --rm sim scripts/run_comparison.sh $SCENARIO $SPEED" >&2
+  echo "  docker compose --profile sim run --rm sim scripts/run_comparison.sh $SCENARIO $SPEED" >&2
   exit 1
 fi
 
@@ -53,7 +61,7 @@ esac
 
 mkdir -p "$OUT_DIR/timeseries"
 # Start from a clean metrics file so a rerun does not append to stale rows.
-rm -f "$OUT_DIR/metrics.csv"
+rm -f "$OUT_DIR/metrics.csv" "$OUT_DIR"/ekf_evaluation*.csv
 
 for CONTROLLER in pure_pursuit stanley; do
   echo
@@ -78,11 +86,15 @@ for CONTROLLER in pure_pursuit stanley; do
     echo "warning: $CONTROLLER hit the ${TIMEOUT}s timeout on $SCENARIO" >&2
   fi
 
-  # Gazebo can leave processes behind when a launch is interrupted; a stale
-  # gzserver holds the port and the next run silently attaches to the old world.
-  pkill -f gzserver >/dev/null 2>&1 || true
-  pkill -f gzclient >/dev/null 2>&1 || true
+  # Gazebo can leave processes behind when a launch is interrupted and a stale
+  # server would answer the next run's spawn request from the old world.
+  pkill -f "gz sim" >/dev/null 2>&1 || true
   sleep 3
+
+  # Keep this run's EKF evaluation; the next run would overwrite it.
+  if [ -f "$OUT_DIR/ekf_evaluation.csv" ]; then
+    mv "$OUT_DIR/ekf_evaluation.csv" "$OUT_DIR/ekf_evaluation_${CONTROLLER}.csv"
+  fi
 
   # Every controller must have contributed a row. If the robot failed to spawn,
   # or ground truth never arrived, the recorder writes nothing -- and without
@@ -93,10 +105,16 @@ for CONTROLLER in pure_pursuit stanley; do
     echo "error: $CONTROLLER recorded no metrics for $SCENARIO." >&2
     echo "       The comparison is incomplete and no results will be written." >&2
     echo "       Usual cause: the robot did not spawn, so /ground_truth/odom" >&2
-    echo "       never published. Check the spawn_entity output above." >&2
+    echo "       never published. Check the ros_gz_sim create output above." >&2
     exit 1
   fi
 done
+
+if [ "$SKIP_ANALYSIS" = "1" ]; then
+  echo
+  echo "Done. Raw output in $OUT_DIR (analysis skipped)."
+  exit 0
+fi
 
 echo
 echo "== Analysis =="

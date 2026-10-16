@@ -10,6 +10,12 @@ note() { echo; echo "== $1 =="; }
 
 note "Executables"
 ros2 pkg executables shuttle_control || failed=1
+for exe in path_tracker_node metrics_recorder_node safety_gate_node; do
+  if ! ros2 pkg executables shuttle_control | grep -q " ${exe}$"; then
+    echo "FAIL: shuttle_control has no ${exe}"
+    failed=1
+  fi
+done
 ros2 pkg executables shuttle_localisation || failed=1
 ros2 pkg executables shuttle_perception || failed=1
 
@@ -33,6 +39,28 @@ else
   cat /tmp/xacro.err
   failed=1
 fi
+
+note "Robot and worlds load in Gazebo (gz sdf)"
+# The URDF goes through the same URDF-to-SDF conversion the simulator applies
+# when the robot is spawned, so an unknown plugin element or a malformed sensor
+# shows up here rather than as a robot that silently never appears.
+if gz sdf -p /tmp/robot.urdf > /tmp/robot.sdf 2>/tmp/gzsdf.err \
+    && grep -q "gz::sim::systems::DiffDrive" /tmp/robot.sdf; then
+  echo "ok: robot converts to SDF ($(grep -c '<sensor' /tmp/robot.sdf) sensors)"
+else
+  echo "FAIL: the robot does not convert to SDF"
+  cat /tmp/gzsdf.err
+  failed=1
+fi
+worlds="$(ros2 pkg prefix shuttle_bringup)/share/shuttle_bringup/worlds"
+for world in "$worlds"/*.sdf; do
+  if gz sdf -k "$world" >/dev/null; then
+    echo "ok: $(basename "$world")"
+  else
+    echo "FAIL: $(basename "$world") is not valid SDF"
+    failed=1
+  fi
+done
 
 note "Nav2 controller plugins are registered"
 for plugin in shuttle_control/PurePursuitController shuttle_control/StanleyController; do

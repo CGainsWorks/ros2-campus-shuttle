@@ -3,7 +3,7 @@
 <package format="3">
   <name>shuttle_description</name>
   <version>0.1.0</version>
-  <description>URDF, Gazebo sensor plugins and RViz configuration for the campus shuttle.</description>
+  <description>URDF, Gazebo (gz-sim) systems and sensors and RViz configuration for the campus shuttle.</description>
   <maintainer email="114424105+CGainsWorks@users.noreply.github.com">CGainsWorks</maintainer>
   <license>MIT</license>
 
@@ -13,8 +13,9 @@
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>
   <exec_depend>rviz2</exec_depend>
-  <exec_depend>gazebo_ros</exec_depend>
-  <exec_depend>gazebo_plugins</exec_depend>
+  <!-- The diff drive, joint state, odometry, IMU and sensors systems named in
+       shuttle.gazebo.xacro ship with gz-sim Harmonic. -->
+  <exec_depend>gz_sim_vendor</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

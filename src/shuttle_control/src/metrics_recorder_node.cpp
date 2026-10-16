@@ -16,9 +16,12 @@
 // straight from the physics engine. Nothing here ever looks at the estimated
 // pose the controller was driving on.
 #include <algorithm>
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "nav_msgs/msg/odometry.hpp"
@@ -77,8 +80,8 @@ public:
     wrote_ = true;
 
     if (samples_.empty()) {
-      // Loud, and fatal to the run. An empty result here means the robot was
-      // never spawned or ground truth never arrived, and the comparison would
+      // Loud and fatal to the run. An empty result here means the robot was
+      // never spawned or ground truth never arrived and the comparison would
       // otherwise carry on and report the other controller as if the pair had
       // been measured.
       RCLCPP_ERROR(
@@ -92,6 +95,16 @@ public:
     const RunMetrics m = summarise(
       samples_, controller_, scenario_, target_speed_, /*noise=*/ true,
       path_.length(), goal_reached_, /*diverged=*/ false, /*stalled=*/ false);
+
+    // Create the output tree here rather than relying on the caller to have
+    // done it: an integration test points this at a fresh temporary directory.
+    std::error_code ec;
+    std::filesystem::create_directories(output_dir_ + "/timeseries", ec);
+    if (ec) {
+      RCLCPP_ERROR(
+        get_logger(), "cannot create %s/timeseries: %s", output_dir_.c_str(),
+        ec.message().c_str());
+    }
 
     const std::string tag = controller_ + "_" + scenario_;
     const std::string ts_path = output_dir_ + "/timeseries/" + tag + "_gazebo.csv";
@@ -270,6 +283,15 @@ int main(int argc, char ** argv)
     rate.sleep();
   }
   const bool wrote = node->finish();
+
+  // Keep the node alive briefly after publishing the summary. Exiting the
+  // instant publish() returns can drop the message before a subscriber has
+  // received it and the integration test listens for exactly that message.
+  const auto linger_until = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+  while (rclcpp::ok() && std::chrono::steady_clock::now() < linger_until) {
+    rclcpp::spin_some(node);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
 
   rclcpp::shutdown();
   // Exit non-zero when nothing was recorded, so the calling script can refuse

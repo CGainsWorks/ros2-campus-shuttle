@@ -1,7 +1,8 @@
 """SLAM: drive the world with teleop and build a map.
 
     ros2 launch shuttle_bringup slam.launch.py headless:=false rviz:=true
-    ros2 run teleop_twist_keyboard teleop_twist_keyboard
+    ros2 run teleop_twist_keyboard teleop_twist_keyboard \
+        --ros-args -r cmd_vel:=cmd_vel_in
 
 Save the result with:
     ros2 run nav2_map_server map_saver_cli -f data/maps/campus_map

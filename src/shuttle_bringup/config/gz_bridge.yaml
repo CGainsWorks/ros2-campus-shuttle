@@ -1,0 +1,75 @@
+# ros_gz_bridge topics between Gazebo (gz-sim Harmonic) and ROS 2 Jazzy.
+#
+# The Gazebo topic names are set in shuttle_description/urdf/shuttle.gazebo.xacro
+# to match the ROS names exactly, so each entry below is a single topic with a
+# message type on each side and a direction.
+#
+# Deliberately NOT bridged: the differential drive's own odom transform and the
+# ground-truth transform (both on /model/shuttle/...). robot_localization owns
+# odom -> base_footprint and a second publisher of the same edge would make
+# the TF tree flicker between two answers.
+
+# Simulation clock. Every node runs with use_sim_time, so nothing moves until
+# this is flowing.
+- ros_topic_name: /clock
+  gz_topic_name: /clock
+  ros_type_name: rosgraph_msgs/msg/Clock
+  gz_type_name: gz.msgs.Clock
+  direction: GZ_TO_ROS
+
+# Velocity command, from the safety gate to the base. Nothing else publishes
+# here; every command source goes through the gate on /cmd_vel_in.
+- ros_topic_name: /cmd_vel
+  gz_topic_name: /cmd_vel
+  ros_type_name: geometry_msgs/msg/Twist
+  gz_type_name: gz.msgs.Twist
+  direction: ROS_TO_GZ
+
+# Wheel odometry, integrated from the wheel joint angles.
+- ros_topic_name: /wheel/odom
+  gz_topic_name: /wheel/odom
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: gz.msgs.Odometry
+  direction: GZ_TO_ROS
+
+# Ground-truth pose from the physics engine, in the world frame. Used only for
+# scoring (metrics recorder, EKF evaluator), never by the controller.
+- ros_topic_name: /ground_truth/odom
+  gz_topic_name: /ground_truth/odom
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: gz.msgs.Odometry
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /joint_states
+  gz_topic_name: /joint_states
+  ros_type_name: sensor_msgs/msg/JointState
+  gz_type_name: gz.msgs.Model
+  direction: GZ_TO_ROS
+
+# 2D LiDAR.
+- ros_topic_name: /scan
+  gz_topic_name: /scan
+  ros_type_name: sensor_msgs/msg/LaserScan
+  gz_type_name: gz.msgs.LaserScan
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /imu/data
+  gz_topic_name: /imu/data
+  ros_type_name: sensor_msgs/msg/Imu
+  gz_type_name: gz.msgs.IMU
+  direction: GZ_TO_ROS
+
+# RGB camera and its intrinsics. Bridged lazily, so the 1280 x 720 image is
+# only converted while something on the ROS side is subscribed to it.
+- ros_topic_name: /camera/image_raw
+  gz_topic_name: /camera/image_raw
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+  lazy: true
+
+- ros_topic_name: /camera/camera_info
+  gz_topic_name: /camera/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS

@@ -1,0 +1,97 @@
+<?xml version="1.0" ?>
+<!--
+  Obstacle-free world for the controller comparison.
+
+  The comparison measures path tracking and nothing else. Running it in the
+  furnished campus world is actively wrong: several benchmark routes were laid
+  out in their own coordinates and pass straight through the buildings, so the
+  robot drives into a wall and the run records a stall that has nothing to do
+  with the control law. (The `corner` route's final leg runs through the
+  library.)
+
+  Obstacle avoidance belongs in the Nav2 demo, which uses campus.sdf. Here a
+  ground plane is all that is wanted.
+-->
+<sdf version="1.9">
+  <world name="empty_test">
+
+    <!-- Directional light in place of Classic's model://sun include, which
+         modern Gazebo does not ship locally. -->
+    <light type="directional" name="sun">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!--
+      gz-sim loads nothing by default: physics, the entity factory that
+      ros_gz_sim's create uses to spawn the robot, the scene broadcaster, the
+      rendering sensors (LiDAR and camera, ogre2) and the IMU are all systems.
+    -->
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
+
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.7 0.8 0.9 1</background>
+      <shadows>false</shadows>
+    </scene>
+
+    <physics name="2ms" type="dart">
+      <!-- DART, gz-sim's default engine, in place of Classic's ODE. The
+           step size and real-time pacing are unchanged. -->
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <!--
+        Paced to roughly real time on purpose. Setting this to 0 lets the
+        simulator run as fast as the CPU allows and simulated time then races
+        far ahead of wall time. Any node driving itself from a wall-clock timer
+        is effectively left running open loop: the robot receives one command
+        every several simulated seconds and wanders off the path. Nodes here use
+        sim-time timers but the ROS transport still ties this system to wall
+        time, so pacing the physics is the honest setting. On a slow machine
+        (software rendering in CI) the achieved factor drops below 1, which is
+        harmless because every node runs on the simulation clock.
+      -->
+    </physics>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>400 400</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>0.9</mu><mu2>0.9</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>400 400</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.7 1</ambient>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

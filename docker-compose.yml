@@ -3,13 +3,13 @@
 # The default service builds the small toolchain image and runs the whole
 # pipeline: the controller unit tests, the scenario geometry cross-check, the
 # parameter file validation, the camera-to-LiDAR calibration, the controller
-# tuning and full comparison matrix, the figures and docs/RESULTS.md -- and then
+# tuning and full comparison matrix, the figures and docs/RESULTS.md and then
 # verifies that every expected artifact actually exists and is not empty. It
-# needs no ROS, no Gazebo and no GPU, and takes a couple of minutes.
+# needs no ROS, no Gazebo and no GPU and takes a couple of minutes.
 #
-# The heavier simulation services are opt-in via profiles, because pulling
-# ROS 2 Humble and Gazebo is a multi-gigabyte download that is not needed to
-# check the numbers.
+# The heavier simulation services are opt-in via profiles, because building the
+# ROS 2 Jazzy and Gazebo Harmonic image is a multi-gigabyte download that is not
+# needed to check the numbers.
 
 services:
 
@@ -57,7 +57,7 @@ services:
       - .:/workspace
     command: ["bash", "scripts/run_tests.sh"]
 
-  # --- full ROS 2 + Gazebo stack (opt in) ---------------------------------
+  # --- full ROS 2 Jazzy + Gazebo Harmonic stack (opt in) -------------------
   # docker compose --profile sim run --rm sim
   sim:
     build:
@@ -70,13 +70,14 @@ services:
       - .:/ws
     environment:
       - ROS_DOMAIN_ID=42
-      # gzserver runs headless by default; set DISPLAY and switch headless:=false
-      # for the GUI.
+      # The Gazebo server runs headless with offscreen rendering by default;
+      # set DISPLAY and pass headless:=false for the GUI.
       - QT_X11_NO_MITSHM=1
       - LIBGL_ALWAYS_SOFTWARE=1
     command: ["bash"]
 
-  # Gazebo cross-check of the comparison.
+  # Gazebo cross-check of the comparison: three repeats of `corner` at 1 m/s,
+  # summarised into docs/RESULTS_GAZEBO.md and results/controller_comparison.json.
   # docker compose --profile sim run --rm gazebo-comparison
   gazebo-comparison:
     build:
@@ -90,4 +91,4 @@ services:
     environment:
       - ROS_DOMAIN_ID=42
       - LIBGL_ALWAYS_SOFTWARE=1
-    command: ["bash", "scripts/run_comparison.sh", "campus_loop", "1.0"]
+    command: ["bash", "scripts/run_gazebo_repeats.sh", "3", "corner", "1.0"]

@@ -3,11 +3,11 @@
 
 The brief asks for the EKF to be "validated against ground truth". This node is
 that validation: it subscribes to the filtered pose and to the p3d ground-truth
-pose, aligns them in time, and reports position and heading error, plus whether
+pose, aligns them in time and reports position and heading error, plus whether
 the reported covariance is consistent with the error actually observed.
 
 The consistency check matters more than the raw error. A filter that is
-confidently wrong is more dangerous than one that is honestly uncertain, and
+confidently wrong is more dangerous than one that is honestly uncertain and
 the normalised estimation error squared (NEES) is what exposes that.
 """
 
@@ -21,6 +21,7 @@ from collections import deque
 
 import rclpy
 from nav_msgs.msg import Odometry
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 
 
@@ -44,14 +45,29 @@ class EkfEvaluator(Node):
         # Pairing tolerance. The filtered estimate arrives at roughly 20 Hz, so
         # a 0.05 s gate is exactly one sample period: any lag between the two
         # streams then rejects every pair and the evaluation silently reports
-        # nothing. Allow a few sample periods instead, and report the pairing
+        # nothing. Allow a few sample periods instead and report the pairing
         # error achieved so a poor match is visible rather than assumed away.
         self.declare_parameter("max_pair_dt", 0.15)
+        # The local filter's odom frame starts wherever the robot was spawned,
+        # while ground truth is in the world frame. The estimate is moved into
+        # the world frame by this pose before it is compared. Zero is right
+        # only for a robot spawned at the origin.
+        # Dynamically typed, because a launch argument of "3" arrives as an
+        # integer and would otherwise be rejected against a float default.
+        dynamic = ParameterDescriptor(dynamic_typing=True)
+        self.declare_parameter("odom_origin_x", 0.0, dynamic)
+        self.declare_parameter("odom_origin_y", 0.0, dynamic)
+        self.declare_parameter("odom_origin_yaw", 0.0, dynamic)
 
         self.output_csv = self.get_parameter("output_csv").value
         self.max_pair_dt = float(self.get_parameter("max_pair_dt").value)
+        self.origin = (
+            float(self.get_parameter("odom_origin_x").value),
+            float(self.get_parameter("odom_origin_y").value),
+            float(self.get_parameter("odom_origin_yaw").value),
+        )
 
-        # Ground truth arrives at 50 Hz and the filter at 50 Hz, but not in
+        # Ground truth arrives at 50 Hz and the filter at 50 Hz but not in
         # lockstep. Buffer truth and match each estimate to its nearest sample
         # rather than assuming the two streams are aligned.
         self.truth = deque(maxlen=400)
@@ -95,9 +111,12 @@ class EkfEvaluator(Node):
             return
 
         _, tx, ty, tyaw = truth
-        ex = msg.pose.pose.position.x
-        ey = msg.pose.pose.position.y
-        eyaw = yaw_from_quaternion(msg.pose.pose.orientation)
+        ox, oy, oyaw = self.origin
+        px = msg.pose.pose.position.x
+        py = msg.pose.pose.position.y
+        ex = ox + math.cos(oyaw) * px - math.sin(oyaw) * py
+        ey = oy + math.sin(oyaw) * px + math.cos(oyaw) * py
+        eyaw = wrap_to_pi(oyaw + yaw_from_quaternion(msg.pose.pose.orientation))
 
         dx = ex - tx
         dy = ey - ty
@@ -116,7 +135,7 @@ class EkfEvaluator(Node):
         # fuses body-frame velocities and yaw rate only -- no absolute position
         # and no absolute heading -- so x, y AND yaw are all unobservable and
         # every pose covariance grows without bound. The filter is being honest
-        # about not knowing where it is, but the consequence is that NEES tends
+        # about not knowing where it is but the consequence is that NEES tends
         # to zero simply because the reported uncertainty is enormous, whatever
         # the actual error. Both figures are uninformative for that instance;
         # judge it by the drift statistics instead.
@@ -145,7 +164,7 @@ class EkfEvaluator(Node):
     def report(self) -> None:
         """Write the evaluation. Deliberately not interruptible.
 
-        This runs from the shutdown path, and `ros2 launch` follows its first
+        This runs from the shutdown path and `ros2 launch` follows its first
         SIGINT with more signals if a process does not exit promptly. A second
         SIGINT landing partway through the write raises KeyboardInterrupt inside
         os.makedirs and the results are lost after the whole run has been paid

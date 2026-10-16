@@ -1,109 +1,113 @@
 <?xml version="1.0"?>
 <!--
-  Gazebo Classic plugins: differential drive, 2D LiDAR, IMU, RGB camera and a
-  ground-truth pose source.
+  Gazebo (gz-sim, Harmonic) systems and sensors: differential drive, joint
+  states, a ground-truth pose source, 2D LiDAR, IMU and RGB camera.
 
-  The p3d plugin is the reason the simulation results are trustworthy. It
-  publishes the exact model pose from the physics engine, which is what the
+  Every topic is given an absolute name that matches the ROS name it is bridged
+  to, so config/gz_bridge.yaml in shuttle_bringup reads as a straight list of
+  topic, type and direction. Sensor specifications (rates, resolution, range,
+  field of view, noise) are carried over unchanged from the Gazebo Classic
+  model this replaces, so the robot the controllers see is the same robot.
+
+  The odometry publisher is the reason the simulation results are trustworthy.
+  It publishes the exact model pose from the physics engine, which is what the
   metrics are computed against. Without it the only available "truth" would be
-  the EKF estimate, and a controller that tracked a drifting estimate perfectly
+  the EKF estimate and a controller that tracked a drifting estimate perfectly
   would score perfectly while driving off the path.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="shuttle_gazebo" params="wheel_separation wheel_radius">
 
-    <gazebo reference="base_link">
-      <material>Gazebo/SkyBlue</material>
-    </gazebo>
+    <!-- Contact properties. The URDF converter turns mu1/mu2 into the SDF
+         surface friction and kp/kd into contact stiffness and damping. -->
     <gazebo reference="left_wheel_link">
-      <material>Gazebo/FlatBlack</material>
       <mu1>1.0</mu1>
       <mu2>1.0</mu2>
       <kp>1e6</kp>
       <kd>10.0</kd>
     </gazebo>
     <gazebo reference="right_wheel_link">
-      <material>Gazebo/FlatBlack</material>
       <mu1>1.0</mu1>
       <mu2>1.0</mu2>
       <kp>1e6</kp>
       <kd>10.0</kd>
     </gazebo>
     <gazebo reference="caster_link">
-      <material>Gazebo/Grey</material>
       <!-- Near-frictionless, so the caster does not fight the drive wheels. -->
       <mu1>0.02</mu1>
       <mu2>0.02</mu2>
     </gazebo>
-    <gazebo reference="lidar_link">
-      <material>Gazebo/FlatBlack</material>
-    </gazebo>
 
-    <!-- Differential drive. Publishes wheel odometry and the odom -> base_footprint
-         transform is left to the EKF, not this plugin. -->
+    <!--
+      Differential drive. Publishes wheel odometry on /wheel/odom. Its own
+      odom -> base_footprint transform goes to a model-scoped topic that is not
+      bridged: robot_localization owns that edge and two publishers for one
+      transform would make the tree flicker between two answers.
+
+      The acceleration limits reproduce the Classic plugin's
+      max_wheel_acceleration of 4.0, which that plugin applied to the wheel rim
+      speed in m/s^2: 4.0 m/s^2 linear and 2 x 4.0 / 0.52 = 15.4 rad/s^2 about
+      the vertical axis for wheels driven in opposite directions.
+
+      Odometry is integrated from the wheel joint angles, as an encoder would
+      give it. The Classic model used odometry_source 1 (the world pose), so the
+      wheel odometry here is the more realistic of the two.
+    -->
     <gazebo>
-      <plugin name="diff_drive" filename="libgazebo_ros_diff_drive.so">
-        <ros>
-          <namespace>/</namespace>
-          <remapping>cmd_vel:=cmd_vel</remapping>
-          <remapping>odom:=wheel/odom</remapping>
-        </ros>
-        <update_rate>50</update_rate>
+      <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
         <left_joint>left_wheel_joint</left_joint>
         <right_joint>right_wheel_joint</right_joint>
         <wheel_separation>${wheel_separation}</wheel_separation>
-        <wheel_diameter>${2.0 * wheel_radius}</wheel_diameter>
-        <max_wheel_torque>30.0</max_wheel_torque>
-        <max_wheel_acceleration>4.0</max_wheel_acceleration>
-        <command_topic>cmd_vel</command_topic>
-        <odometry_topic>wheel/odom</odometry_topic>
-        <odometry_frame>odom</odometry_frame>
-        <robot_base_frame>base_footprint</robot_base_frame>
-        <publish_odom>true</publish_odom>
-        <!-- robot_localization owns odom -> base_footprint. Letting the plugin
-             publish it as well would give the tree two parents for the same
-             frame and the transforms would fight. -->
-        <publish_odom_tf>false</publish_odom_tf>
-        <publish_wheel_tf>true</publish_wheel_tf>
-        <odometry_source>1</odometry_source>
+        <wheel_radius>${wheel_radius}</wheel_radius>
+        <topic>/cmd_vel</topic>
+        <odom_topic>/wheel/odom</odom_topic>
+        <tf_topic>/model/shuttle/tf</tf_topic>
+        <frame_id>odom</frame_id>
+        <child_frame_id>base_footprint</child_frame_id>
+        <odom_publish_frequency>50</odom_publish_frequency>
+        <max_linear_acceleration>4.0</max_linear_acceleration>
+        <min_linear_acceleration>-4.0</min_linear_acceleration>
+        <max_angular_acceleration>15.4</max_angular_acceleration>
+        <min_angular_acceleration>-15.4</min_angular_acceleration>
       </plugin>
     </gazebo>
 
     <!-- Joint states for robot_state_publisher. -->
     <gazebo>
-      <plugin name="joint_states" filename="libgazebo_ros_joint_state_publisher.so">
-        <ros>
-          <namespace>/</namespace>
-          <remapping>~/out:=joint_states</remapping>
-        </ros>
-        <update_rate>50</update_rate>
+      <plugin filename="gz-sim-joint-state-publisher-system"
+              name="gz::sim::systems::JointStatePublisher">
+        <topic>/joint_states</topic>
         <joint_name>left_wheel_joint</joint_name>
         <joint_name>right_wheel_joint</joint_name>
       </plugin>
     </gazebo>
 
-    <!-- Ground truth pose, straight from the physics engine. -->
+    <!-- Ground truth pose, straight from the physics engine, in the world
+         frame. Planar (dimensions 2), noise free, 50 Hz. -->
     <gazebo>
-      <plugin name="ground_truth" filename="libgazebo_ros_p3d.so">
-        <ros>
-          <namespace>/</namespace>
-          <remapping>odom:=ground_truth/odom</remapping>
-        </ros>
-        <update_rate>50</update_rate>
-        <body_name>base_footprint</body_name>
-        <frame_name>world</frame_name>
-        <gaussian_noise>0.0</gaussian_noise>
+      <plugin filename="gz-sim-odometry-publisher-system"
+              name="gz::sim::systems::OdometryPublisher">
+        <odom_frame>world</odom_frame>
+        <robot_base_frame>base_footprint</robot_base_frame>
+        <odom_topic>/ground_truth/odom</odom_topic>
+        <odom_covariance_topic>/model/shuttle/ground_truth_with_covariance</odom_covariance_topic>
+        <tf_topic>/model/shuttle/ground_truth_tf</tf_topic>
+        <odom_publish_frequency>50</odom_publish_frequency>
+        <dimensions>2</dimensions>
       </plugin>
     </gazebo>
 
-    <!-- 2D LiDAR, 360 degrees, 10 Hz. -->
+    <!-- 2D LiDAR, 360 degrees, 720 samples, 10 Hz. -->
     <gazebo reference="lidar_link">
-      <sensor name="lidar" type="ray">
+      <sensor name="lidar" type="gpu_lidar">
         <pose>0 0 0 0 0 0</pose>
+        <topic>/scan</topic>
+        <gz_frame_id>lidar_link</gz_frame_id>
+        <always_on>true</always_on>
         <visualize>false</visualize>
         <update_rate>10</update_rate>
-        <ray>
+        <lidar>
           <scan>
             <horizontal>
               <samples>720</samples>
@@ -111,6 +115,12 @@
               <min_angle>-3.14159</min_angle>
               <max_angle>3.14159</max_angle>
             </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0.0</min_angle>
+              <max_angle>0.0</max_angle>
+            </vertical>
           </scan>
           <range>
             <min>0.16</min>
@@ -122,21 +132,15 @@
             <mean>0.0</mean>
             <stddev>0.012</stddev>
           </noise>
-        </ray>
-        <plugin name="lidar_controller" filename="libgazebo_ros_ray_sensor.so">
-          <ros>
-            <namespace>/</namespace>
-            <remapping>~/out:=scan</remapping>
-          </ros>
-          <output_type>sensor_msgs/LaserScan</output_type>
-          <frame_name>lidar_link</frame_name>
-        </plugin>
+        </lidar>
       </sensor>
     </gazebo>
 
     <!-- IMU, 100 Hz. -->
     <gazebo reference="imu_link">
       <sensor name="imu" type="imu">
+        <topic>/imu/data</topic>
+        <gz_frame_id>imu_link</gz_frame_id>
         <always_on>true</always_on>
         <update_rate>100</update_rate>
         <imu>
@@ -165,24 +169,20 @@
             </y>
           </linear_acceleration>
         </imu>
-        <plugin name="imu_controller" filename="libgazebo_ros_imu_sensor.so">
-          <ros>
-            <namespace>/</namespace>
-            <remapping>~/out:=imu/data</remapping>
-          </ros>
-          <initial_orientation_as_reference>false</initial_orientation_as_reference>
-          <frame_name>imu_link</frame_name>
-        </plugin>
       </sensor>
     </gazebo>
 
-    <!-- RGB camera, 15 Hz. Publishes camera_info, which the extrinsic
-         calibration needs for the intrinsics. -->
+    <!-- RGB camera, 1280 x 720 at 15 Hz. Publishes camera_info, which the
+         extrinsic calibration needs for the intrinsics. Images are labelled in
+         the REP 103 optical frame. -->
     <gazebo reference="camera_link">
       <sensor name="camera" type="camera">
+        <topic>/camera/image_raw</topic>
+        <gz_frame_id>camera_optical_frame</gz_frame_id>
         <always_on>true</always_on>
         <update_rate>15</update_rate>
         <camera>
+          <camera_info_topic>/camera/camera_info</camera_info_topic>
           <horizontal_fov>1.089</horizontal_fov>
           <image>
             <width>1280</width>
@@ -199,13 +199,6 @@
             <stddev>0.005</stddev>
           </noise>
         </camera>
-        <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
-          <ros>
-            <namespace>/</namespace>
-          </ros>
-          <camera_name>camera</camera_name>
-          <frame_name>camera_optical_frame</frame_name>
-        </plugin>
       </sensor>
     </gazebo>
 
