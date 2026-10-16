@@ -22,6 +22,8 @@ find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(shuttle_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # The ROS-free controller core. Built here as a subproject so the node, the
 # Nav2 plugins and the offline benchmark all link the identical objects.
@@ -51,6 +53,12 @@ add_executable(metrics_recorder_node src/metrics_recorder_node.cpp)
 target_link_libraries(metrics_recorder_node shuttle_control_core)
 ament_target_dependencies(metrics_recorder_node ${NODE_DEPS})
 
+# The safety gate: command-timeout watchdog and latched e-stop in front of the
+# base. Its decisions live in the core (CommandGate); this is the ROS wrapper.
+add_executable(safety_gate_node src/safety_gate_node.cpp)
+target_link_libraries(safety_gate_node shuttle_control_core)
+ament_target_dependencies(safety_gate_node rclcpp geometry_msgs std_msgs std_srvs)
+
 add_library(shuttle_nav2_controllers SHARED src/nav2_shuttle_controllers.cpp)
 target_include_directories(shuttle_nav2_controllers PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -67,7 +75,7 @@ ament_target_dependencies(shuttle_nav2_controllers
 
 pluginlib_export_plugin_description_file(nav2_core plugins.xml)
 
-install(TARGETS path_tracker_node metrics_recorder_node
+install(TARGETS path_tracker_node metrics_recorder_node safety_gate_node
   DESTINATION lib/${PROJECT_NAME}
 )
 install(TARGETS shuttle_control_core shuttle_nav2_controllers

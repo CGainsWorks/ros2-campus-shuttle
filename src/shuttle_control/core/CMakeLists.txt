@@ -25,6 +25,7 @@ add_library(shuttle_control_core
   src/metrics.cpp
   src/scenarios.cpp
   src/bench_runner.cpp
+  src/command_gate.cpp
 )
 
 target_include_directories(shuttle_control_core PUBLIC

@@ -5,7 +5,8 @@
   <version>0.1.0</version>
   <description>
     Pure Pursuit and Stanley path trackers for the campus shuttle, as a
-    standalone node and as Nav2 controller plugins. The control maths lives in a
+    standalone node and as Nav2 controller plugins and the safety gate
+    (command-timeout watchdog and latched e-stop) in front of the base. The control maths lives in a
     ROS-free core library so the same code can be benchmarked offline.
   </description>
   <maintainer email="114424105+CGainsWorks@users.noreply.github.com">CGainsWorks</maintainer>
@@ -25,6 +26,8 @@
   <depend>nav2_util</depend>
   <depend>pluginlib</depend>
   <depend>shuttle_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

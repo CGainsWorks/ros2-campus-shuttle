@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "shuttle_control/bench_runner.hpp"
+#include "shuttle_control/command_gate.hpp"
 #include "shuttle_control/diff_drive_model.hpp"
 #include "shuttle_control/metrics.hpp"
 #include "shuttle_control/path.hpp"
@@ -305,7 +306,7 @@ void testConvergence()
 ///
 /// This exists because a hand-chained version of the staircase scenario emitted
 /// a path that jumped backwards by 1.15 m at one corner. The controllers then
-/// stalled there, and the failure looked exactly like a controller defect. A
+/// stalled there and the failure looked exactly like a controller defect. A
 /// comparison is only worth reporting if the reference trajectories are sound,
 /// so they are checked rather than assumed.
 void testPathContinuity()
@@ -328,7 +329,7 @@ void testPathContinuity()
       }
     }
     // Paths are sampled at 0.05 m; allow a little slack for the final sample of
-    // each primitive, but nothing near a real discontinuity.
+    // each primitive but nothing near a real discontinuity.
     if (worst_gap > 0.08) {
       std::cout << "    " << name << " has a " << worst_gap << " m gap\n";
     }
@@ -409,6 +410,68 @@ void testDeterminism()
   CHECK_NEAR(ra.metrics.cross_track.rms, rb.metrics.cross_track.rms, 1e-15);
 }
 
+void testCommandGate()
+{
+  TEST_CASE("command gate forwards fresh commands and zeroes stale ones");
+  CommandGateParams params;
+  params.cmd_timeout = 0.5;
+  CommandGate gate(params);
+
+  // Nothing received yet: the base is held at zero.
+  auto held = gate.onTick(0.0);
+  CHECK(held.has_value());
+  CHECK_NEAR(held->v, 0.0, 0.0);
+  CHECK(gate.state() == GateState::kNoCommand);
+
+  Twist2D cmd;
+  cmd.v = 1.0;
+  cmd.omega = 0.3;
+  const Twist2D out = gate.onCommand(cmd, 1.0);
+  CHECK_NEAR(out.v, 1.0, 0.0);
+  CHECK_NEAR(out.omega, 0.3, 0.0);
+  // Fresh: the tick leaves the forwarded command alone.
+  CHECK(!gate.onTick(1.4).has_value());
+  CHECK(gate.state() == GateState::kForwarding);
+  // Exactly at the timeout is still fresh; just past it is stale.
+  CHECK(!gate.onTick(1.5).has_value());
+  auto stale = gate.onTick(1.5001);
+  CHECK(stale.has_value());
+  CHECK_NEAR(stale->v, 0.0, 0.0);
+  CHECK_NEAR(stale->omega, 0.0, 0.0);
+  CHECK(gate.state() == GateState::kTimedOut);
+  // A new command resumes forwarding at once.
+  CHECK_NEAR(gate.onCommand(cmd, 2.0).v, 1.0, 0.0);
+  CHECK(!gate.onTick(2.1).has_value());
+  // A clock that runs backwards (simulator reset) is treated as stale.
+  CHECK(gate.onTick(1.0).has_value());
+
+  TEST_CASE("e-stop latches, drops commands and needs a fresh command after release");
+  CommandGate estop(params);
+  estop.onCommand(cmd, 0.0);
+  CHECK(estop.engageEStop());
+  CHECK(!estop.engageEStop());  // already engaged
+  CHECK(estop.eStopped());
+  const Twist2D dropped = estop.onCommand(cmd, 0.1);
+  CHECK_NEAR(dropped.v, 0.0, 0.0);
+  CHECK_NEAR(dropped.omega, 0.0, 0.0);
+  auto stopped = estop.onTick(0.15);
+  CHECK(stopped.has_value());
+  CHECK_NEAR(stopped->v, 0.0, 0.0);
+  CHECK(estop.state() == GateState::kEStopped);
+  // Commands keep arriving during the stop; none of them survives it.
+  for (int i = 0; i < 10; ++i) {
+    estop.onCommand(cmd, 0.2 + 0.05 * i);
+  }
+  CHECK(estop.releaseEStop());
+  CHECK(!estop.releaseEStop());  // already released
+  auto after_release = estop.onTick(0.7);
+  CHECK(after_release.has_value());
+  CHECK_NEAR(after_release->v, 0.0, 0.0);
+  CHECK(estop.state() == GateState::kNoCommand);
+  CHECK_NEAR(estop.onCommand(cmd, 0.8).v, 1.0, 0.0);
+  CHECK(!estop.onTick(0.85).has_value());
+}
+
 }  // namespace
 
 int main()
@@ -425,6 +488,7 @@ int main()
   testSetPathPreservesSpeed();
   testConvergence();
   testDeterminism();
+  testCommandGate();
 
   const auto & r = testing_lite::Registry::instance();
   std::cout << "\n" << r.checks << " checks, " << r.failures << " failures\n";
