@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Reference trajectories for the controller comparison.
 //
 // The same six paths are driven by both controllers at every speed and noise
@@ -20,8 +26,8 @@ struct Scenario
   std::string name;
   std::string description;
   Path path;
-  Pose2D start;         ///< initial true pose of the robot
-  double timeout{240.0};///< s, abort if the goal is not reached
+  Pose2D start;           ///< initial true pose of the robot
+  double timeout{240.0};  ///< s, abort if the goal is not reached
 };
 
 /// Build every scenario at the given nominal speed.

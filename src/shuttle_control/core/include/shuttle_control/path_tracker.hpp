@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Common interface and shared longitudinal control for the path trackers.
 #pragma once
 
@@ -30,9 +36,9 @@ public:
   explicit SpeedLimiter(const SpeedLimits & limits = SpeedLimits())
   : limits_(limits) {}
 
-  void setLimits(const SpeedLimits & limits) { limits_ = limits; }
-  const SpeedLimits & limits() const { return limits_; }
-  void reset() { v_prev_ = 0.0; initialised_ = false; }
+  void setLimits(const SpeedLimits & limits) {limits_ = limits;}
+  const SpeedLimits & limits() const {return limits_;}
+  void reset() {v_prev_ = 0.0; initialised_ = false;}
 
   /// Compute the commanded speed.
   /// @param v_ref        reference speed carried by the path
@@ -70,12 +76,12 @@ public:
   /// Compute a velocity command for the current state.
   virtual Twist2D computeCommand(const VehicleState & state, double dt) = 0;
 
-  const TrackingError & lastError() const { return last_error_; }
-  bool goalReached() const { return goal_reached_; }
-  const Path & path() const { return path_; }
+  const TrackingError & lastError() const {return last_error_;}
+  bool goalReached() const {return goal_reached_;}
+  const Path & path() const {return path_;}
 
-  TrackerCommon & common() { return common_; }
-  const TrackerCommon & common() const { return common_; }
+  TrackerCommon & common() {return common_;}
+  const TrackerCommon & common() const {return common_;}
 
 protected:
   /// Project the pose, update `last_error_` and the goal flag.

@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Nav2 controller plugins wrapping the shuttle path trackers.
 //
 // Exposing the controllers as nav2_core::Controller plugins means Nav2 can

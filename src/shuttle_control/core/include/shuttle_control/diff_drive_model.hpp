@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Differential-drive plant model for the offline benchmark.
 //
 // This is not a replacement for Gazebo. It exists so the controller comparison
@@ -50,8 +56,8 @@ public:
   DiffDriveModel(const DiffDriveParams & params, const NoiseParams & noise, std::uint32_t seed)
   : params_(params), noise_(noise), rng_(seed) {}
 
-  void setParams(const DiffDriveParams & p) { params_ = p; }
-  void setNoise(const NoiseParams & n) { noise_ = n; }
+  void setParams(const DiffDriveParams & p) {params_ = p;}
+  void setNoise(const NoiseParams & n) {noise_ = n;}
 
   /// Reset to a pose. The RNG is re-seeded so that a given (scenario, speed,
   /// noise) combination produces the same disturbance sequence for every
@@ -62,14 +68,14 @@ public:
   void step(const Twist2D & cmd, double dt);
 
   /// True state (the Gazebo-ground-truth analogue). Used only for metrics.
-  const Pose2D & truePose() const { return pose_; }
-  double trueV() const { return v_; }
-  double trueOmega() const { return omega_; }
+  const Pose2D & truePose() const {return pose_;}
+  double trueV() const {return v_;}
+  double trueOmega() const {return omega_;}
 
   /// Noisy measurement handed to the controller.
   VehicleState measure(double t);
 
-  const DiffDriveParams & params() const { return params_; }
+  const DiffDriveParams & params() const {return params_;}
 
 private:
   double gauss(double sigma);

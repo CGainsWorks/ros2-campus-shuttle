@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Minimal assertion harness.
 //
 // The core library depends on nothing but the standard library, and its tests
@@ -6,7 +12,9 @@
 #pragma once
 
 #include <cmath>
+#include <functional>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -53,9 +61,27 @@ inline void checkNear(
   }
 }
 
+/// Compare two values and print both on failure, so a wrong size or count
+/// reports what it actually was rather than only that the check failed.
+template<typename A, typename B, typename Cmp>
+inline void checkCompare(
+  const A & a, const B & b, Cmp cmp, const char * expr, const char * file, int line)
+{
+  ++Registry::instance().checks;
+  if (!cmp(a, b)) {
+    std::ostringstream msg;
+    msg << "expected " << expr << ", got " << a << " and " << b;
+    reportFailure(file, line, msg.str());
+  }
+}
+
 }  // namespace testing_lite
 
 #define CHECK(cond) testing_lite::checkTrue((cond), #cond, __FILE__, __LINE__)
+#define CHECK_EQ(a, b) \
+  testing_lite::checkCompare((a), (b), std::equal_to<>(), #a " == " #b, __FILE__, __LINE__)
+#define CHECK_GT(a, b) \
+  testing_lite::checkCompare((a), (b), std::greater<>(), #a " > " #b, __FILE__, __LINE__)
 #define CHECK_NEAR(actual, expected, tol) \
   testing_lite::checkNear((actual), (expected), (tol), #actual, __FILE__, __LINE__)
 #define TEST_CASE(name) \

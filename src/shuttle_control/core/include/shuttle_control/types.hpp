@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Basic 2D types shared by the path trackers, the plant model and the metrics.
 //
 // This header (and everything else under core/) deliberately depends on nothing

@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 #include <cmath>
 #include <iostream>
 #include <vector>
@@ -56,7 +62,7 @@ void testPathGeometry()
 {
   TEST_CASE("path arc length, heading and curvature");
   const Path p = straightPath(10.0);
-  CHECK(p.size() > 100);
+  CHECK_GT(p.size(), 100u);
   CHECK_NEAR(p.length(), 10.0, 1e-6);
   CHECK_NEAR(p.front().yaw, 0.0, 1e-9);
   CHECK_NEAR(p.back().yaw, 0.0, 1e-9);
@@ -200,7 +206,7 @@ void testMetrics()
   CHECK_NEAR(st.rms, std::sqrt((1.0 + 4.0 + 9.0 + 16.0) / 4.0), 1e-12);
   CHECK_NEAR(st.max_abs, 4.0, 1e-12);
   CHECK_NEAR(st.final_abs, 4.0, 1e-12);
-  CHECK(st.count == 4);
+  CHECK_EQ(st.count, 4u);
 }
 
 /// The steering-sign checks below are the ones that would catch a flipped
@@ -252,9 +258,9 @@ void testConvergence()
 
     PurePursuit pp;
     Stanley st;
-    PathTracker * tracker = (which == 0)
-      ? static_cast<PathTracker *>(&pp)
-      : static_cast<PathTracker *>(&st);
+    PathTracker * tracker = (which == 0) ?
+      static_cast<PathTracker *>(&pp) :
+      static_cast<PathTracker *>(&st);
     tracker->common().speed.v_max = 1.0;
     tracker->common().max_omega = 1.5;
     tracker->common().search_window = 120;
@@ -280,9 +286,9 @@ void testConvergence()
 
     PurePursuit pp;
     Stanley st;
-    PathTracker * tracker = (which == 0)
-      ? static_cast<PathTracker *>(&pp)
-      : static_cast<PathTracker *>(&st);
+    PathTracker * tracker = (which == 0) ?
+      static_cast<PathTracker *>(&pp) :
+      static_cast<PathTracker *>(&st);
     tracker->common().speed.v_max = 1.0;
     tracker->common().search_window = 120;
 
@@ -308,7 +314,7 @@ void testPathContinuity()
   for (const auto & name : scenarioNames()) {
     Scenario sc;
     CHECK(makeScenario(name, 1.0, sc));
-    CHECK(sc.path.size() > 10);
+    CHECK_GT(sc.path.size(), 10u);
 
     double worst_gap = 0.0;
     bool monotonic = true;

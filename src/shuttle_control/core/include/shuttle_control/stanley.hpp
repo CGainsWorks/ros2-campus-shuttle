@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Stanley path tracker, adapted to a differential-drive base.
 //
 // The Stanley law (Stanford's DARPA Grand Challenge entry) is defined for a
@@ -49,17 +55,17 @@ public:
   explicit Stanley(const StanleyParams & params)
   : params_(params) {}
 
-  const char * name() const override { return "stanley"; }
+  const char * name() const override {return "stanley";}
 
-  StanleyParams & params() { return params_; }
-  const StanleyParams & params() const { return params_; }
+  StanleyParams & params() {return params_;}
+  const StanleyParams & params() const {return params_;}
 
   Twist2D computeCommand(const VehicleState & state, double dt) override;
 
   /// Steering angle commanded on the most recent call, rad.
-  double lastSteer() const { return last_steer_; }
+  double lastSteer() const {return last_steer_;}
   /// Cross-track error at the virtual front axle on the most recent call, m.
-  double lastFrontAxleError() const { return last_fa_error_; }
+  double lastFrontAxleError() const {return last_fa_error_;}
 
 private:
   StanleyParams params_;

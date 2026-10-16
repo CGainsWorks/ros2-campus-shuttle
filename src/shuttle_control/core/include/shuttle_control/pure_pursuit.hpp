@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Pure Pursuit path tracker.
 //
 // Geometric law: pick a goal point one lookahead distance ahead on the path,
@@ -42,22 +48,22 @@ public:
   explicit PurePursuit(const PurePursuitParams & params)
   : params_(params) {}
 
-  const char * name() const override { return "pure_pursuit"; }
+  const char * name() const override {return "pure_pursuit";}
 
-  PurePursuitParams & params() { return params_; }
-  const PurePursuitParams & params() const { return params_; }
+  PurePursuitParams & params() {return params_;}
+  const PurePursuitParams & params() const {return params_;}
 
   Twist2D computeCommand(const VehicleState & state, double dt) override;
   void reset() override;
 
   /// True while the stop-and-rotate recovery is engaged.
-  bool rotating() const { return rotating_; }
+  bool rotating() const {return rotating_;}
 
   /// Lookahead distance used on the most recent call, m.
-  double lastLookahead() const { return last_lookahead_; }
+  double lastLookahead() const {return last_lookahead_;}
   /// Goal point used on the most recent call, in the world frame.
-  double lastGoalX() const { return last_goal_x_; }
-  double lastGoalY() const { return last_goal_y_; }
+  double lastGoalX() const {return last_goal_x_;}
+  double lastGoalY() const {return last_goal_y_;}
 
 private:
   PurePursuitParams params_;

@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Records tracking metrics for a Gazebo run.
 //
 // Deliberately written in C++ against shuttle_control_core rather than as a
@@ -84,8 +90,8 @@ public:
     }
 
     const RunMetrics m = summarise(
-      samples_, controller_, scenario_, target_speed_, /*noise=*/true,
-      path_.length(), goal_reached_, /*diverged=*/false, /*stalled=*/false);
+      samples_, controller_, scenario_, target_speed_, /*noise=*/ true,
+      path_.length(), goal_reached_, /*diverged=*/ false, /*stalled=*/ false);
 
     const std::string tag = controller_ + "_" + scenario_;
     const std::string ts_path = output_dir_ + "/timeseries/" + tag + "_gazebo.csv";

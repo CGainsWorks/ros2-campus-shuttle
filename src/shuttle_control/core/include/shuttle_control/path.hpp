@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Reference path: arc-length parameterisation, curvature, and projection.
 #pragma once
 
@@ -25,15 +31,15 @@ public:
     const std::vector<double> & ys,
     double nominal_speed);
 
-  bool empty() const { return points_.empty(); }
-  std::size_t size() const { return points_.size(); }
-  const std::vector<PathPoint> & points() const { return points_; }
-  const PathPoint & at(std::size_t i) const { return points_[i]; }
-  const PathPoint & front() const { return points_.front(); }
-  const PathPoint & back() const { return points_.back(); }
+  bool empty() const {return points_.empty();}
+  std::size_t size() const {return points_.size();}
+  const std::vector<PathPoint> & points() const {return points_;}
+  const PathPoint & at(std::size_t i) const {return points_[i];}
+  const PathPoint & front() const {return points_.front();}
+  const PathPoint & back() const {return points_.back();}
 
   /// Total arc length, m.
-  double length() const { return points_.empty() ? 0.0 : points_.back().s; }
+  double length() const {return points_.empty() ? 0.0 : points_.back().s;}
 
   /// Interpolate the path at arc length `s` (clamped to the path extent).
   PathPoint interpolate(double s) const;
@@ -47,7 +53,7 @@ public:
   TrackingError project(const Pose2D & pose) const;
 
   /// Remaining arc length from `s` to the end of the path.
-  double remaining(double s) const { return length() - s; }
+  double remaining(double s) const {return length() - s;}
 
 private:
   std::vector<PathPoint> points_;

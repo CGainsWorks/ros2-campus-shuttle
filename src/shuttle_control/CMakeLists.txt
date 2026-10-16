@@ -87,11 +87,6 @@ install(DIRECTORY core/include/
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # Per-file copyright headers are not used in this repository; the licence is
-  # declared once in LICENSE. cpplint overlaps with the uncrustify style already
-  # enforced, so it is skipped rather than fought.
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 

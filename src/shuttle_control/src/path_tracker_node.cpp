@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Standalone ROS 2 path-tracking node.
 //
 // Wraps the controllers from shuttle_control_core. The node is deliberately

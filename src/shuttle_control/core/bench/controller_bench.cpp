@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Offline, headless, deterministic comparison of Pure Pursuit against Stanley.
 //
 // Usage:
@@ -303,7 +309,7 @@ int main(int argc, char ** argv)
       opt.timeseries = false;
     } else if (a == "--help" || a == "-h") {
       std::cout << "controller_bench [--out DIR] [--speeds a,b,c] [--tune] "
-                   "[--gains FILE] [--no-timeseries] [--dump-paths DIR]\n";
+        "[--gains FILE] [--no-timeseries] [--dump-paths DIR]\n";
       return 0;
     } else {
       std::cerr << "unknown argument: " << a << "\n";
@@ -403,8 +409,8 @@ int main(int argc, char ** argv)
           ++runs;
           if (res.metrics.diverged || res.metrics.stalled || !res.metrics.goal_reached) {
             ++failures;
-            const char * why = res.metrics.diverged ? " diverged"
-              : (res.metrics.stalled ? " stalled" : " did not reach the goal");
+            const char * why = res.metrics.diverged ? " diverged" :
+              (res.metrics.stalled ? " stalled" : " did not reach the goal");
             std::cout << "  [!] " << res.metrics.controller << " " << scenario_name
                       << " @ " << speed << " m/s" << (noise ? " +noise" : "") << why
                       << " (progress " << std::fixed << std::setprecision(1)

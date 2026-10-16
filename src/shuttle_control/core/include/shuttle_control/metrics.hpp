@@ -1,3 +1,9 @@
+// Copyright 2026 CGainsWorks
+//
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file or at
+// https://opensource.org/licenses/MIT.
+
 // Tracking-error metrics.
 //
 // Every quantity here is computed from the *true* pose (the plant state
@@ -33,13 +39,13 @@ ErrorStats computeStats(const std::vector<double> & values);
 struct Sample
 {
   double t{0.0};
-  double x{0.0};          ///< true pose
+  double x{0.0};            ///< true pose
   double y{0.0};
   double yaw{0.0};
-  double x_meas{0.0};     ///< pose the controller saw
+  double x_meas{0.0};       ///< pose the controller saw
   double y_meas{0.0};
   double yaw_meas{0.0};
-  double path_x{0.0};     ///< projection of the true pose onto the path
+  double path_x{0.0};       ///< projection of the true pose onto the path
   double path_y{0.0};
   double s{0.0};
   double cross_track{0.0};  ///< signed, left-positive, at base_link
@@ -62,21 +68,21 @@ struct RunMetrics
   ErrorStats cross_track;
   ErrorStats heading;
 
-  double duration{0.0};          ///< s
-  double path_length{0.0};       ///< m
-  double distance_travelled{0.0};///< m, true path integral
-  double progress{0.0};          ///< fraction of path arc length completed, 0..1
+  double duration{0.0};            ///< s
+  double path_length{0.0};         ///< m
+  double distance_travelled{0.0};  ///< m, true path integral
+  double progress{0.0};            ///< fraction of path arc length completed, 0..1
   bool goal_reached{false};
-  bool diverged{false};          ///< |cross-track| exceeded the abort threshold
+  bool diverged{false};            ///< |cross-track| exceeded the abort threshold
   /// Stopped making forward progress along the path while still on it. This is
   /// how Pure Pursuit fails with too small a lookahead: it stays on the line
   /// and spins, so it neither diverges nor arrives.
   bool stalled{false};
 
-  double mean_speed{0.0};        ///< m/s
-  double control_effort{0.0};    ///< RMS of d(omega_cmd)/dt, rad/s^2
-  double rms_omega{0.0};         ///< rad/s
-  double max_lateral_accel{0.0}; ///< m/s^2
+  double mean_speed{0.0};          ///< m/s
+  double control_effort{0.0};      ///< RMS of d(omega_cmd)/dt, rad/s^2
+  double rms_omega{0.0};           ///< rad/s
+  double max_lateral_accel{0.0};   ///< m/s^2
 };
 
 /// Compute the aggregate metrics for a completed run.
