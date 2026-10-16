@@ -18,7 +18,7 @@ carrying no passengers, always within line of sight of a trained operator.
 | Collision with a pedestrian | Perception misses a low or thin obstacle; 2D LiDAR sees one horizontal slice only | Speed limited to 1.5 m/s; Nav2 inflation radius 0.65 m against a 0.55 m robot radius; operator supervision | 2D-only sensing is a real limitation, see below |
 | Collision with a static obstacle | Localisation drift; costmap not updated | Global costmap from a prior map plus live scan; local rolling costmap | Implemented in simulation |
 | Runaway on a control fault | Controller commands a velocity the operator cannot override | Software e-stop in the safety gate (latched, drops all commands); hardware emergency stop cutting motor power, independent of software | Software e-stop **implemented and tested in simulation**; hardware stop **not simulated** |
-| Loss of localisation | Scan matching fails in a feature-poor area | `ekf_evaluator` reports drift and NEES against ground truth | Measured in Gazebo: 0.159 to 0.275 m RMS drift over a 22.7 m dead-reckoned run. Covariance is unbounded in this configuration, so it cannot be used as a divergence trigger; the stop-on-divergence behaviour is **not** implemented |
+| Loss of localisation | Scan matching fails in a feature-poor area | `ekf_evaluator` reports drift and NEES against ground truth | Measured in Gazebo: 0.204 to 0.442 m RMS drift over a 22.7 m dead-reckoned run. Covariance is unbounded in this configuration, so it cannot be used as a divergence trigger; the stop-on-divergence behaviour is **not** implemented |
 | Stale command | A node dies while the last `cmd_vel` is still being executed | Command-timeout watchdog in the safety gate; a firmware timeout in the base | Watchdog **implemented and tested in simulation**. The simulated differential drive, like a motor controller without a firmware timeout, executes its last command for ever, so if the gate itself dies nothing stops it; the firmware timeout is **not simulated** |
 | Tracking failure on tight corners | Controller limit-cycles or cuts a corner | Benchmarked over seven scenarios including corners tighter than the tuning set; stalls and divergence are recorded as explicit outcomes | Implemented and tested |
 
@@ -61,7 +61,7 @@ of the e-stop and within 1.0 s of the last command when commands stop.
 headless with the gate in front of the base, drives at 1.0 m/s and checks both
 on every CI run. Measured (simulated time, Gazebo Harmonic): from 1.00 m/s to
 rest in 0.26 s after the e-stop, with full-speed commands still arriving at
-20 Hz; and at rest 0.76 s after the last command for the timeout, of which 0.5 s
+20 Hz; and at rest 0.77 s after the last command for the timeout, of which 0.5 s
 is the timeout itself. The test also checks the base was still moving partway
 into the timeout window, so it is the watchdog that stopped it and that it
 stays stopped after the e-stop is released.

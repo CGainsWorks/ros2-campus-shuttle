@@ -226,18 +226,20 @@ Across 3 independent repeats (simulated, Gazebo Harmonic):
 
 | RMS cross-track | Pure Pursuit | Stanley |
 | --- | ---: | ---: |
-| repeat 1 | 0.0615 m | 0.0610 m |
-| repeat 2 | 0.0649 m | 0.0618 m |
-| repeat 3 | 0.0553 m | 0.0548 m |
+| repeat 1 | 0.0566 m | 0.0479 m |
+| repeat 2 | 0.0513 m | 0.1215 m |
+| repeat 3 | 0.1114 m | 0.0583 m |
 
-**Gazebo does not separate these two controllers on this route.** Stanley comes
-out lower in every repeat but by 0.5 to 3.1 mm, while each controller's own
-result moves by 7 to 10 mm from one repeat to the next. A gap smaller than
-the run-to-run spread is not a ranking. The spread also depends on the machine:
-on a busier CPU the dead-reckoning drift grows and so does the measured error,
-which is why the CI integration test bounds it only as a sanity limit. This is why the headline comparison is
-the deterministic benchmark, where the same inputs give bit-identical outputs
-and an 84-run matrix backs the conclusion.
+**Gazebo does not separate these two controllers on this route.** Stanley is
+closer in repeats 1 and 3 and Pure Pursuit in repeat 2. Each controller's own
+result more than doubles from its best repeat to its worst, which is more than
+any gap between them, so no ranking survives. Each controller's worst repeat is
+also the one where its localisation drifted most (below): the error follows the
+odometry, not the control law. The spread depends on the machine too. On a
+busier CPU the dead-reckoning drift grows and so does the measured error, which
+is why the CI integration test bounds it only as a sanity limit. This is why
+the headline comparison is the deterministic benchmark, where the same inputs
+give bit-identical outputs and an 84-run matrix backs the conclusion.
 
 Why the errors are an order of magnitude above the benchmark's: they are not
 measuring the same thing. The comparison runs use a static `map -> odom` (the
@@ -247,16 +249,16 @@ measures that drift directly over the same runs:
 
 | EKF against Gazebo ground truth | across all repeats and controllers |
 | --- | ---: |
-| Position error (RMS) | 0.159 to 0.275 m |
-| Position error (max) | 0.250 to 0.383 m |
-| Heading error (RMS) | 0.0115 to 0.0253 rad |
+| Position error (RMS) | 0.204 to 0.442 m |
+| Position error (max) | 0.263 to 0.625 m |
+| Heading error (RMS) | 0.0169 to 0.0415 rad |
 
 **The localisation drift is larger than the entire measured tracking error.**
-Split along and across the direction of travel, it is 0.15 to 0.27 m RMS along
-it and 0.054 to 0.068 m across it. The along-track part only moves the point
+Split along and across the direction of travel, it is 0.20 to 0.42 m RMS along
+it and 0.053 to 0.126 m across it. The along-track part only moves the point
 where the robot believes the route ends; the across-track part moves the robot
 off the line and on its own it is the size of the whole measured tracking
-error (0.055 to 0.065 m). So the Gazebo figures are dominated by odometry rather
+error (0.048 to 0.121 m) run by run. So the Gazebo figures are dominated by odometry rather
 than by the control law, which is the other reason they cannot rank the two
 controllers. Treat the bench numbers as the controller comparison and these as
 a system-level check: the stack drives the route, the localisation drifts about
@@ -307,7 +309,7 @@ speed under 0.05 m/s) within 0.5 s of the e-stop and within 1.0 s of the last
 command when commands stop. `src/shuttle_bringup/test/test_safety_sim.py`
 proves both in Gazebo on every CI run. Measured (simulated time): from 1.00 m/s
 to rest in 0.26 s after the e-stop, with full-speed commands still arriving;
-and at rest 0.76 s after the last command for the timeout. Details and what is
+and at rest 0.77 s after the last command for the timeout. Details and what is
 still not covered: **[docs/SAFETY.md](docs/SAFETY.md)**.
 
 ## Tests

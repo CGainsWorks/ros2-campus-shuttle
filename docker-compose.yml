@@ -69,7 +69,14 @@ services:
     volumes:
       - .:/ws
     environment:
+      # Keep ROS and Gazebo discovery inside this container. On Docker's default
+      # bridge, DDS and gz-transport otherwise find any other ROS or Gazebo
+      # container on the host and a stray /cmd_vel or /clock from it would
+      # contaminate a measured run.
       - ROS_DOMAIN_ID=42
+      - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+      - GZ_IP=127.0.0.1
+      - GZ_PARTITION=shuttle
       # The Gazebo server runs headless with offscreen rendering by default;
       # set DISPLAY and pass headless:=false for the GUI.
       - QT_X11_NO_MITSHM=1
@@ -89,6 +96,13 @@ services:
     volumes:
       - .:/ws
     environment:
+      # Keep ROS and Gazebo discovery inside this container. On Docker's default
+      # bridge, DDS and gz-transport otherwise find any other ROS or Gazebo
+      # container on the host and a stray /cmd_vel or /clock from it would
+      # contaminate a measured run.
       - ROS_DOMAIN_ID=42
+      - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+      - GZ_IP=127.0.0.1
+      - GZ_PARTITION=shuttle
       - LIBGL_ALWAYS_SOFTWARE=1
     command: ["bash", "scripts/run_gazebo_repeats.sh", "3", "corner", "1.0"]

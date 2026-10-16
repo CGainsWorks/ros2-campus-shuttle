@@ -26,7 +26,7 @@ run on hardware.
   latched e-stop (topic and service) in front of the base, logic unit tested in
   the core and `test_safety_sim.py` proving in Gazebo that the base is at rest
   within 0.5 s of an e-stop and within 1.0 s of the last command (simulated:
-  0.26 s and 0.76 s measured).
+  0.26 s and 0.77 s measured).
 - **Headless integration test in CI.** `test_comparison_sim.py` starts Gazebo,
   the bridge, the gate, the EKF, the path publisher, the tracker and the
   metrics recorder, runs `corner` at 1.0 m/s with each controller and asserts

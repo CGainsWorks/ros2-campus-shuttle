@@ -180,137 +180,137 @@
     "repeats": [
       {
         "pure_pursuit": {
-          "rms_m": 0.0615,
-          "max_m": 0.1756,
+          "rms_m": 0.0566,
+          "max_m": 0.1591,
           "goal_reached": true,
-          "progress": 0.985,
-          "control_effort": 0.26
+          "progress": 0.978,
+          "control_effort": 0.31
         },
         "stanley": {
-          "rms_m": 0.061,
-          "max_m": 0.1485,
+          "rms_m": 0.0479,
+          "max_m": 0.1402,
           "goal_reached": true,
-          "progress": 0.986,
-          "control_effort": 0.46
-        },
-        "ekf": [
-          {
-            "controller": "pure_pursuit",
-            "position_rms_m": 0.173,
-            "position_max_m": 0.25,
-            "heading_rms_rad": 0.0125,
-            "along_track_rms_m": 0.163,
-            "cross_track_rms_m": 0.058
-          },
-          {
-            "controller": "stanley",
-            "position_rms_m": 0.159,
-            "position_max_m": 0.25,
-            "heading_rms_rad": 0.0115,
-            "along_track_rms_m": 0.147,
-            "cross_track_rms_m": 0.062
-          }
-        ]
-      },
-      {
-        "pure_pursuit": {
-          "rms_m": 0.0649,
-          "max_m": 0.1805,
-          "goal_reached": true,
-          "progress": 0.985,
-          "control_effort": 0.27
-        },
-        "stanley": {
-          "rms_m": 0.0618,
-          "max_m": 0.1371,
-          "goal_reached": true,
-          "progress": 0.977,
+          "progress": 0.981,
           "control_effort": 0.42
         },
         "ekf": [
           {
             "controller": "pure_pursuit",
-            "position_rms_m": 0.172,
-            "position_max_m": 0.256,
-            "heading_rms_rad": 0.0125,
-            "along_track_rms_m": 0.16,
-            "cross_track_rms_m": 0.061
+            "position_rms_m": 0.262,
+            "position_max_m": 0.368,
+            "heading_rms_rad": 0.024,
+            "along_track_rms_m": 0.255,
+            "cross_track_rms_m": 0.058
           },
           {
             "controller": "stanley",
-            "position_rms_m": 0.275,
-            "position_max_m": 0.383,
-            "heading_rms_rad": 0.0253,
-            "along_track_rms_m": 0.267,
-            "cross_track_rms_m": 0.068
+            "position_rms_m": 0.21,
+            "position_max_m": 0.276,
+            "heading_rms_rad": 0.018,
+            "along_track_rms_m": 0.202,
+            "cross_track_rms_m": 0.056
           }
         ]
       },
       {
         "pure_pursuit": {
-          "rms_m": 0.0553,
-          "max_m": 0.1744,
+          "rms_m": 0.0513,
+          "max_m": 0.1704,
           "goal_reached": true,
-          "progress": 0.983,
+          "progress": 0.982,
           "control_effort": 0.28
         },
         "stanley": {
-          "rms_m": 0.0548,
-          "max_m": 0.1438,
+          "rms_m": 0.1215,
+          "max_m": 0.3519,
           "goal_reached": true,
-          "progress": 0.982,
-          "control_effort": 0.47
+          "progress": 0.966,
+          "control_effort": 0.37
         },
         "ekf": [
           {
             "controller": "pure_pursuit",
-            "position_rms_m": 0.2,
-            "position_max_m": 0.256,
+            "position_rms_m": 0.204,
+            "position_max_m": 0.263,
             "heading_rms_rad": 0.0169,
-            "along_track_rms_m": 0.193,
-            "cross_track_rms_m": 0.054
+            "along_track_rms_m": 0.197,
+            "cross_track_rms_m": 0.053
           },
           {
             "controller": "stanley",
-            "position_rms_m": 0.208,
-            "position_max_m": 0.276,
-            "heading_rms_rad": 0.018,
-            "along_track_rms_m": 0.2,
-            "cross_track_rms_m": 0.058
+            "position_rms_m": 0.442,
+            "position_max_m": 0.625,
+            "heading_rms_rad": 0.0415,
+            "along_track_rms_m": 0.424,
+            "cross_track_rms_m": 0.126
+          }
+        ]
+      },
+      {
+        "pure_pursuit": {
+          "rms_m": 0.1114,
+          "max_m": 0.3232,
+          "goal_reached": true,
+          "progress": 0.968,
+          "control_effort": 0.34
+        },
+        "stanley": {
+          "rms_m": 0.0583,
+          "max_m": 0.1331,
+          "goal_reached": true,
+          "progress": 0.977,
+          "control_effort": 0.45
+        },
+        "ekf": [
+          {
+            "controller": "pure_pursuit",
+            "position_rms_m": 0.42,
+            "position_max_m": 0.59,
+            "heading_rms_rad": 0.0399,
+            "along_track_rms_m": 0.406,
+            "cross_track_rms_m": 0.109
+          },
+          {
+            "controller": "stanley",
+            "position_rms_m": 0.266,
+            "position_max_m": 0.457,
+            "heading_rms_rad": 0.0244,
+            "along_track_rms_m": 0.258,
+            "cross_track_rms_m": 0.063
           }
         ]
       }
     ],
     "rms_span_m": {
       "pure_pursuit": [
-        0.0553,
-        0.0649
+        0.0513,
+        0.1114
       ],
       "stanley": [
-        0.0548,
-        0.0618
+        0.0479,
+        0.1215
       ]
     },
     "ekf_span": {
       "position_rms_m": [
-        0.159,
-        0.275
+        0.204,
+        0.442
       ],
       "position_max_m": [
-        0.25,
-        0.383
+        0.263,
+        0.625
       ],
       "heading_rms_rad": [
-        0.0115,
-        0.0253
+        0.0169,
+        0.0415
       ],
       "along_track_rms_m": [
-        0.147,
-        0.267
+        0.197,
+        0.424
       ],
       "cross_track_rms_m": [
-        0.054,
-        0.068
+        0.053,
+        0.126
       ]
     }
   },
@@ -321,7 +321,7 @@
       "bound_s": 1.0,
       "cmd_timeout_s": 0.5,
       "initial_speed_mps": 1.0,
-      "time_to_rest_s": 0.764
+      "time_to_rest_s": 0.766
     },
     "estop": {
       "bound_s": 0.5,
