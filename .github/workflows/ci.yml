@@ -5,13 +5,28 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      keep_outputs:
+        description: "Upload the regenerated results and the simulation test output"
+        type: boolean
+        default: false
+
+# A second push to the same ref cancels the run it supersedes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   # Everything that does not need ROS. This is the job that guards the headline
-  # result, and it runs in about a minute.
+  # result and the numbers the README quotes and it runs in a couple of
+  # minutes.
   core:
-    name: Controller core, geometry and calibration
+    name: Controller core, results and README
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -34,60 +49,96 @@ jobs:
       # committed artifacts are stale or something has become non-reproducible.
       - name: Committed results are reproducible
         run: |
+          python3 analysis/summarise_results.py --check
           if ! git diff --exit-code --stat -- \
               docs/RESULTS.md analysis/figures calibration/extrinsics.yaml \
-              src/shuttle_bringup/config/tuned_gains.yaml; then
+              src/shuttle_bringup/config/tuned_gains.yaml \
+              results/controller_comparison.json; then
             echo "::error::regenerating changed committed artifacts; " \
                  "re-run scripts/run_all.sh and commit the result"
             exit 1
           fi
 
+      # Every number the README quotes, against the committed results file, the
+      # calibration report and the unit test count.
+      - name: README matches the results
+        run: |
+          checks=$(/tmp/shuttle-core-build/test_core | tail -n 1 | awk '{print $1}')
+          python3 scripts/check_readme.py --test-core-checks "$checks"
+
+      - name: Python lint
+        run: pipx run --spec flake8==7.1.1 flake8 --max-line-length 100 analysis src tests scripts
+
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: github.event_name == 'workflow_dispatch' && inputs.keep_outputs
         with:
           name: comparison-results
+          retention-days: 7
           path: |
             results/bench/metrics.csv
+            results/controller_comparison.json
             docs/RESULTS.md
             analysis/figures
 
-  # The ROS 2 workspace. Build and lint only; the Gazebo comparison is too heavy
-  # for CI and is run locally via scripts/run_comparison.sh.
-  ros:
-    name: colcon build (Humble)
+  # The ROS 2 workspace in the simulation image (ROS 2 Jazzy, Gazebo Harmonic),
+  # built from docker/Dockerfile exactly as `docker compose --profile sim`
+  # builds it. Then the ament linters, the unit tests and the two launch_testing
+  # integration tests, which run the simulator headless: the safety layer
+  # (e-stop and command timeout bring the base to rest) and the comparison
+  # scenario for both controllers.
+  sim:
+    name: ROS 2 Jazzy + Gazebo Harmonic
     runs-on: ubuntu-latest
-    container:
-      image: osrf/ros:humble-desktop
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          apt-get update
-          rosdep update --rosdistro humble
-          rosdep install --from-paths src --ignore-src -y \
-            --rosdistro humble || true
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Build
-        shell: bash
-        run: |
-          source /opt/ros/humble/setup.bash
-          colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
-
-      - name: Test
-        shell: bash
-        run: |
-          source /opt/ros/humble/setup.bash
-          colcon test --return-code-on-test-failure
-          colcon test-result --verbose
-
-  lint:
-    name: Python lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      # The dependency layer is keyed on the package.xml files alone and comes
+      # back from the Actions cache, so a push that changes no dependency pays
+      # only for the workspace build.
+      - name: Build the simulation image
+        uses: docker/build-push-action@v6
         with:
-          python-version: "3.11"
-      - run: pip install flake8
-      - run: flake8 --max-line-length 100 analysis src tests
+          context: .
+          file: docker/Dockerfile
+          build-args: ROSDEP_SKIP_KEYS=rviz2
+          tags: ros2-campus-shuttle/sim:ci
+          load: true
+          cache-from: type=gha,scope=sim
+          cache-to: type=gha,mode=max,scope=sim
+
+      - name: ROS smoke test (scripts/verify_ros.sh)
+        run: docker run --rm ros2-campus-shuttle/sim:ci bash /opt/shuttle_ws/scripts/verify_ros.sh
+
+      # No bind mount: the container writes as root, which a Linux runner's
+      # checkout (uid 1001) would refuse. Outputs are copied out afterwards.
+      - name: Lint, unit and simulation tests (colcon test)
+        run: |
+          docker run --name shuttle-test \
+            -e ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
+            -e SHUTTLE_TEST_OUTPUT_DIR=/tmp/sim-results \
+            -w /opt/shuttle_ws \
+            ros2-campus-shuttle/sim:ci bash -c '
+              colcon test --event-handlers console_cohesion+ \
+                --return-code-on-test-failure
+              status=$?
+              colcon test-result --verbose
+              exit $status'
+
+      - name: Simulation test output
+        if: always()
+        run: |
+          docker cp shuttle-test:/tmp/sim-results ./sim-results || true
+          docker cp shuttle-test:/opt/shuttle_ws/log/latest_test ./sim-results/colcon-log || true
+          docker rm -f shuttle-test || true
+          cat sim-results/safety_stop_times.json || true
+          cat sim-results/comparison/metrics.csv || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure() || (github.event_name == 'workflow_dispatch' && inputs.keep_outputs)
+        with:
+          name: simulation-test-output
+          retention-days: 7
+          path: sim-results
